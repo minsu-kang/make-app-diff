@@ -16,7 +16,19 @@ Built with Electron + React + TypeScript for macOS.
 - **Three themes** — Dark (default), Make (purple), Light (Apple-inspired)
 - **App download** — Download any app version to a local folder in SDK structure
 
-## Setup
+## Installation
+
+Download the latest DMG from the [Releases](https://github.com/minsu-kang/make-app-diff/releases) page.
+
+> **"MakeDiff is damaged" warning on macOS**
+>
+> The app is not code-signed, so macOS Gatekeeper will block it. Run the following in Terminal:
+> ```bash
+> xattr -cr /Applications/MakeDiff.app
+> ```
+> The app will open normally after this.
+
+## Development
 
 ```bash
 npm install
