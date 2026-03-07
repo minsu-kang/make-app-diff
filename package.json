@@ -48,6 +48,7 @@
   "build": {
     "appId": "com.make.app-diff",
     "productName": "MakeDiff",
+    "icon": "resources/icon.icns",
     "mac": {
       "target": "dmg"
     }
