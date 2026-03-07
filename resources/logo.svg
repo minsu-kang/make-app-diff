@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6C3FB5"/>
+      <stop offset="100%" stop-color="#4A1A8A"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="108" fill="url(#shine)"/>
+
+  <!-- Left doc (old version) - slightly behind -->
+  <g transform="translate(80, 80)">
+    <rect x="0" y="20" width="200" height="260" rx="16" fill="#fff" opacity="0.15"/>
+    <!-- Lines -->
+    <rect x="24" y="52" width="120" height="8" rx="4" fill="#fff" opacity="0.25"/>
+    <rect x="24" y="72" width="152" height="8" rx="4" fill="#fff" opacity="0.25"/>
+    <rect x="24" y="92" width="100" height="8" rx="4" fill="#fff" opacity="0.25"/>
+    <rect x="24" y="122" width="140" height="8" rx="4" fill="#f85149" opacity="0.7"/>
+    <rect x="24" y="142" width="110" height="8" rx="4" fill="#f85149" opacity="0.7"/>
+    <rect x="24" y="172" width="130" height="8" rx="4" fill="#fff" opacity="0.25"/>
+    <rect x="24" y="192" width="90" height="8" rx="4" fill="#fff" opacity="0.25"/>
+    <rect x="24" y="222" width="152" height="8" rx="4" fill="#fff" opacity="0.25"/>
+    <rect x="24" y="242" width="80" height="8" rx="4" fill="#fff" opacity="0.25"/>
+  </g>
+
+  <!-- Right doc (new version) - in front -->
+  <g transform="translate(232, 152)">
+    <rect x="0" y="0" width="200" height="260" rx="16" fill="#fff" opacity="0.92"/>
+    <!-- Lines -->
+    <rect x="24" y="32" width="120" height="8" rx="4" fill="#4A1A8A" opacity="0.2"/>
+    <rect x="24" y="52" width="152" height="8" rx="4" fill="#4A1A8A" opacity="0.2"/>
+    <rect x="24" y="72" width="100" height="8" rx="4" fill="#4A1A8A" opacity="0.2"/>
+    <rect x="24" y="102" width="140" height="8" rx="4" fill="#2ea043" opacity="0.85"/>
+    <rect x="24" y="122" width="125" height="8" rx="4" fill="#2ea043" opacity="0.85"/>
+    <rect x="24" y="142" width="90" height="8" rx="4" fill="#2ea043" opacity="0.85"/>
+    <rect x="24" y="172" width="130" height="8" rx="4" fill="#4A1A8A" opacity="0.2"/>
+    <rect x="24" y="192" width="90" height="8" rx="4" fill="#4A1A8A" opacity="0.2"/>
+    <rect x="24" y="222" width="152" height="8" rx="4" fill="#4A1A8A" opacity="0.2"/>
+  </g>
+
+  <!-- Diff arrow -->
+  <g transform="translate(196, 210)">
+    <circle cx="0" cy="0" r="28" fill="#fff" opacity="0.95"/>
+    <path d="M-10 -6 L4 -6 L4 -12 L14 0 L4 12 L4 6 L-10 6 Z" fill="#6C3FB5"/>
+  </g>
+</svg>
