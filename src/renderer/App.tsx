@@ -215,7 +215,7 @@ export default function App() {
             <button
               className="update-banner-btn update-banner-brew"
               onClick={() => {
-                navigator.clipboard.writeText('brew upgrade --cask --no-quarantine makediff')
+                navigator.clipboard.writeText('brew update && brew upgrade --cask makediff')
                 showToast('Copied to clipboard', 'success')
               }}
             >

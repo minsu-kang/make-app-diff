@@ -27,6 +27,12 @@ brew install --cask --no-quarantine minsu-kang/makediff/makediff
 
 The `--no-quarantine` flag skips Gatekeeper checks, allowing the unsigned app to launch without the `xattr -cr` workaround.
 
+To update to the latest version:
+
+```bash
+brew update && brew upgrade --cask makediff
+```
+
 ### Manual Download
 
 Download the latest release from the [Releases](https://github.com/minsu-kang/make-app-diff/releases) page:
