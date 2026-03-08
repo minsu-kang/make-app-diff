@@ -368,7 +368,8 @@ export function registerIpcHandlers(): void {
     if (process.platform === 'win32') {
       url = `${base}/MakeDiff.Setup.${version}.exe`
     } else {
-      url = `${base}/MakeDiff-${version}-arm64.dmg`
+      const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
+      url = `${base}/MakeDiff-${version}-${arch}.dmg`
     }
     shell.openExternal(url)
   })
