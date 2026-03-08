@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.2](https://github.com/minsu-kang/make-app-diff/compare/v1.2.1...v1.2.2) (2026-03-08)
+
+
+### Bug Fixes
+
+* add actor check to release-please skip conditions ([414c35c](https://github.com/minsu-kang/make-app-diff/commit/414c35c89fc665f2087c7f18d5cbc9b207316ca6))
+* update banner improvements and skip checks on release-please ([2072b8b](https://github.com/minsu-kang/make-app-diff/commit/2072b8b0d3e00481a09bb7088c668fb4e87402fc))
+* upgrade electron 31.7.7 → 35.7.5 (security patch) ([325ac7c](https://github.com/minsu-kang/make-app-diff/commit/325ac7c6af78c03dfb9ec27a44e6cfc15ebe4281))
+
 ## [1.2.1](https://github.com/minsu-kang/make-app-diff/compare/v1.2.0...v1.2.1) (2026-03-08)
 
 
