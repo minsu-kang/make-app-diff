@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.3.0](https://github.com/minsu-kang/make-app-diff/compare/v1.2.2...v1.3.0) (2026-03-08)
+## [1.2.3](https://github.com/minsu-kang/make-app-diff/compare/v1.2.2...v1.2.3) (2026-03-08)
 
 
 ### Features
