@@ -1,0 +1,16 @@
+language: en-US
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  path_instructions:
+    - path: 'src/main/**'
+      instructions: 'Main process code. Check for security issues, proper IPC error handling, and no renderer logic leaking in.'
+    - path: 'src/preload/**'
+      instructions: 'Preload bridge. Must only expose IPC via contextBridge. No business logic.'
+    - path: 'src/renderer/**'
+      instructions: 'React UI code. No Node.js APIs. Check for proper state management and CSS variable usage.'
+    - path: '.github/workflows/**'
+      instructions: 'CI/CD workflows. Check for security best practices and proper secret handling.'
+chat:
+  auto_reply: true
