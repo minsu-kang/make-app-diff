@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.1](https://github.com/minsu-kang/make-app-diff/compare/v1.2.0...v1.2.1) (2026-03-08)
+
+
+### Bug Fixes
+
+* add feedback for Check for Updates ([fa020cd](https://github.com/minsu-kang/make-app-diff/commit/fa020cd37cde8c9afd51c0cf2a24001d230fb658))
+* align update:open-release with IpcResult contract ([5585074](https://github.com/minsu-kang/make-app-diff/commit/5585074f0cb4ecc5989be76feaa44c1bcfa4ccf2))
+* correct CodeRabbit config schema (move tools under reviews) ([f621b2c](https://github.com/minsu-kang/make-app-diff/commit/f621b2ced90b4a113fd4ebe2f70515ad9b683211))
+* update banner direct download and button clickability ([15d2767](https://github.com/minsu-kang/make-app-diff/commit/15d276793ed5f7222d77a9be5ea12c29203de71b))
+* update banner direct download and button clickability ([b13dc83](https://github.com/minsu-kang/make-app-diff/commit/b13dc83985b888bf623a01f9248a10a105bd2d0f))
+
 ## [1.2.0](https://github.com/minsu-kang/make-app-diff/compare/v1.1.0...v1.2.0) (2026-03-08)
 
 
