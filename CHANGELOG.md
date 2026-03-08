@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/minsu-kang/make-app-diff/compare/v1.1.0...v1.2.0) (2026-03-08)
+
+
+### Features
+
+* add Windows support and CI improvements ([054b491](https://github.com/minsu-kang/make-app-diff/commit/054b491ae939d1e80c4e404d13250585cbde7413))
+* add Windows support and CI improvements ([a3ee558](https://github.com/minsu-kang/make-app-diff/commit/a3ee558f1254bb65ff1b4e80397ba04563564f9e))
+
 ## [1.1.0](https://github.com/minsu-kang/make-app-diff/compare/v1.0.0...v1.1.0) (2026-03-08)
 
 
