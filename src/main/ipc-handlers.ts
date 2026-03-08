@@ -338,11 +338,22 @@ export function registerIpcHandlers(): void {
           archive.finalize()
         })
 
-        // macOS clipboard: copy file reference via NSFilenamesPboardType
-        const plist = `<?xml version="1.0" encoding="UTF-8"?>
+        if (process.platform === 'darwin') {
+          // macOS clipboard: copy file reference via NSFilenamesPboardType
+          const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><array><string>${zipPath}</string></array></plist>`
-        clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist))
+          clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist))
+        } else {
+          // Windows clipboard: use PowerShell + .NET to set CF_HDROP file drop list
+          const escaped = zipPath.replace(/'/g, "''")
+          await new Promise<void>((resolve, reject) => {
+            exec(
+              `powershell -command "Add-Type -AssemblyName System.Windows.Forms; $col = New-Object System.Collections.Specialized.StringCollection; $col.Add('${escaped}'); [System.Windows.Forms.Clipboard]::SetFileDropList($col)"`,
+              (err) => (err ? reject(err) : resolve())
+            )
+          })
+        }
 
         return { success: true, data: zipPath }
       } catch (error: unknown) {

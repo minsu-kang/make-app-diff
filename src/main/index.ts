@@ -68,7 +68,7 @@ function buildMenu(mainWindow: BrowserWindow): void {
   const hasTokens = !!(settings.ipmToken || settings.ipmeToken)
 
   const template: Electron.MenuItemConstructorOptions[] = [
-    { role: 'appMenu' },
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' } as Electron.MenuItemConstructorOptions] : []),
     {
       label: 'File',
       submenu: [
@@ -99,7 +99,7 @@ function buildMenu(mainWindow: BrowserWindow): void {
           click: () => checkForUpdates(mainWindow, true)
         },
         { type: 'separator' },
-        { role: 'close' }
+        process.platform === 'darwin' ? { role: 'close' } : { role: 'quit' }
       ]
     },
     { role: 'editMenu' },

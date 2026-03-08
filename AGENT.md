@@ -75,16 +75,18 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 | `favorites:save` | `FavoriteApp[]` | `{ success }` |
 | `recent:load` | — | `IpcResult<RecentApp[]>` |
 | `recent:add` | `name, label` | `IpcResult<RecentApp[]>` |
+| `editor:open-diff` | `{ filePath, fromVersion, toVersion, oldContent, newContent }` | `IpcResult<void>` |
+| `clipboard:copy-zip` | `{ appName, version, files: {path,content}[] }` | `IpcResult<string>` (zip path) |
 | `update:check` | — | `IpcResult<void>` |
-| `update:open-release` | — | `void` (opens browser) |
+| `update:open-release` | `version` | `IpcResult<void>` (opens browser) |
 
 **Menu events:** `menu:download-app`, `menu:open-settings`, `menu:show-info`
 
-**Renderer events (main → renderer):** `update:available` (version string)
+**Renderer events (main → renderer):** `update:available` (version string), `update:up-to-date`, `update:error`
 
 ## Preload Exposed Objects
 
-- `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `update`, `showInFinder` namespaces)
+- `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `update`, `editor`, `clipboard`, `showInFinder` namespaces)
 - `window.appVersion` — `{ app, electron, chrome, node }`
 - `window.onMenu` — `{ downloadApp, openSettings, showInfo }` callback registration (each returns cleanup function)
 
@@ -233,6 +235,8 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Full file context (no line skipping)
 - Cmd+A selects only the active side (left or right)
 - Copy handler strips empty placeholder rows (no blank lines from the other side)
+- Copy button: copies file content (show mode) or unified diff (diff mode) via `navigator.clipboard.writeText`
+- Open in VS Code button: writes temp files and runs `code --diff` via `editor:open-diff`
 - `tab-size: 2` for compact indentation
 - `user-select: text` overrides global `user-select: none`
 
@@ -243,7 +247,8 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 
 ### VersionSelector (`VersionSelector.tsx`)
 - From/To dropdowns with swap button, Compare button (Cmd+Enter)
-- Inline download row with Show and Download buttons
+- Inline download row with Show, Download, and Copy ZIP buttons
+- Copy ZIP: creates ZIP archive → copies file reference to clipboard (macOS: `NSFilenamesPboardType`, Windows: PowerShell `CF_HDROP`)
 - Version timeline toggle
 
 ### VersionTimeline (`VersionTimeline.tsx`)
@@ -288,6 +293,22 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - `filterDiffs` in App.tsx must handle both compiled (`accounts/`, `hooks/`) and SDK (`connections/`, `webhooks/`) folder prefixes
 - Electron `editMenu` role required for Cmd+A/C/V/X to work in renderer
 - Platform-conditional window config: `titleBarStyle`/`trafficLightPosition` only on macOS
+- File menu items (Compare, Download, Check for Updates) disabled until settings are validated via `enableMenuItems()`
+
+## Platform-Specific Behaviors
+
+| Feature | macOS | Windows |
+|---------|-------|---------|
+| Window frame | `hiddenInset` + custom traffic light position | Default system frame |
+| Clipboard copy ZIP | `NSFilenamesPboardType` plist buffer | PowerShell `Clipboard.SetFileDropList()` (`CF_HDROP`) |
+| Update download URL | `MakeDiff-{ver}-{arm64\|x64}.dmg` | `MakeDiff.Setup.{ver}.exe` |
+| App quit on all windows closed | No (stays in dock) | Yes (`app.quit()`) |
+
+## Temp Files
+
+- Temp directory: `os.tmpdir()/makediff/`
+- `editor:open-diff` writes `{base}@{version}{ext}` pairs, opens `code --diff`
+- `clipboard:copy-zip` writes `{appName}@{version}.zip`
 
 ## CI/CD
 
