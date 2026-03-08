@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.4](https://github.com/minsu-kang/make-app-diff/compare/v1.2.3...v1.2.4) (2026-03-08)
+
+
+### Bug Fixes
+
+* add brew upgrade command to update banner and README ([62dc48a](https://github.com/minsu-kang/make-app-diff/commit/62dc48aeec3f21e3a0d53306bc40c028c1953fd8))
+
 ## [1.2.3](https://github.com/minsu-kang/make-app-diff/compare/v1.2.2...v1.2.3) (2026-03-08)
 
 
