@@ -740,10 +740,7 @@ function isPlainObj(val: unknown): val is Record<string, unknown> {
  * Recursively remove fields from `epoch` that are identical to `modApi`.
  * For nested objects, recurse and keep only differing sub-fields.
  */
-function removeCommonFields(
-  epoch: Record<string, unknown>,
-  modApi: Record<string, unknown>
-): Record<string, unknown> {
+function removeCommonFields(epoch: Record<string, unknown>, modApi: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(epoch)) {
     if (!(key in modApi)) {

@@ -41,10 +41,10 @@ function createWindow(): void {
 
 export async function checkForUpdates(mainWindow: BrowserWindow): Promise<void> {
   try {
-    const { data } = await axios.get(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
-      { headers: { Accept: 'application/vnd.github.v3+json' }, timeout: 10000 }
-    )
+    const { data } = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github.v3+json' },
+      timeout: 10000
+    })
     const latest = (data.tag_name as string).replace(/^v/, '')
     const current = app.getVersion()
     if (latest !== current) {

@@ -365,7 +365,13 @@ interface DiffViewerProps {
   toVersion?: string
 }
 
-export default function DiffViewer({ diffs, selectedFile, viewMode = 'diff', fromVersion, toVersion }: DiffViewerProps) {
+export default function DiffViewer({
+  diffs,
+  selectedFile,
+  viewMode = 'diff',
+  fromVersion,
+  toVersion
+}: DiffViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDark, setIsDark] = useState(true)
   const activeSideRef = useRef<'left' | 'right' | null>(null)
@@ -997,9 +1003,7 @@ export default function DiffViewer({ diffs, selectedFile, viewMode = 'diff', fro
   const handleCopyContent = useCallback(async () => {
     if (visibleDiffs.length === 0) return
     const diff = visibleDiffs[0]
-    const text = viewMode === 'show'
-      ? (diff.newContent || diff.oldContent)
-      : diff.unifiedDiff
+    const text = viewMode === 'show' ? diff.newContent || diff.oldContent : diff.unifiedDiff
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)

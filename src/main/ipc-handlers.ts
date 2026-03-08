@@ -270,68 +270,85 @@ export function registerIpcHandlers(): void {
     return { success: true, data: trimmed }
   })
 
-  ipcMain.handle('editor:open-diff', async (_event, opts: {
-    filePath: string; fromVersion: string; toVersion: string
-    oldContent: string; newContent: string
-  }) => {
-    try {
-      const tmpDir = path.join(tmpdir(), 'makediff')
-      await fs.mkdir(tmpDir, { recursive: true })
+  ipcMain.handle(
+    'editor:open-diff',
+    async (
+      _event,
+      opts: {
+        filePath: string
+        fromVersion: string
+        toVersion: string
+        oldContent: string
+        newContent: string
+      }
+    ) => {
+      try {
+        const tmpDir = path.join(tmpdir(), 'makediff')
+        await fs.mkdir(tmpDir, { recursive: true })
 
-      const ext = path.extname(opts.filePath)
-      const base = path.basename(opts.filePath, ext)
-      const oldFile = path.join(tmpDir, `${base}@${opts.fromVersion}${ext}`)
-      const newFile = path.join(tmpDir, `${base}@${opts.toVersion}${ext}`)
+        const ext = path.extname(opts.filePath)
+        const base = path.basename(opts.filePath, ext)
+        const oldFile = path.join(tmpDir, `${base}@${opts.fromVersion}${ext}`)
+        const newFile = path.join(tmpDir, `${base}@${opts.toVersion}${ext}`)
 
-      await fs.writeFile(oldFile, opts.oldContent, 'utf-8')
-      await fs.writeFile(newFile, opts.newContent, 'utf-8')
+        await fs.writeFile(oldFile, opts.oldContent, 'utf-8')
+        await fs.writeFile(newFile, opts.newContent, 'utf-8')
 
-      return new Promise((resolve) => {
-        exec(`code --diff "${oldFile}" "${newFile}"`, (err) => {
-          if (err) resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
-          else resolve({ success: true })
+        return new Promise((resolve) => {
+          exec(`code --diff "${oldFile}" "${newFile}"`, (err) => {
+            if (err) resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
+            else resolve({ success: true })
+          })
         })
-      })
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { success: false, error: message }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { success: false, error: message }
+      }
     }
-  })
+  )
 
-  ipcMain.handle('clipboard:copy-zip', async (_event, opts: {
-    appName: string; version: string; files: { path: string; content: string }[]
-  }) => {
-    try {
-      const tmpDir = path.join(tmpdir(), 'makediff')
-      await fs.mkdir(tmpDir, { recursive: true })
+  ipcMain.handle(
+    'clipboard:copy-zip',
+    async (
+      _event,
+      opts: {
+        appName: string
+        version: string
+        files: { path: string; content: string }[]
+      }
+    ) => {
+      try {
+        const tmpDir = path.join(tmpdir(), 'makediff')
+        await fs.mkdir(tmpDir, { recursive: true })
 
-      const zipName = `${opts.appName}@${opts.version}.zip`
-      const zipPath = path.join(tmpDir, zipName)
+        const zipName = `${opts.appName}@${opts.version}.zip`
+        const zipPath = path.join(tmpDir, zipName)
 
-      await new Promise<void>((resolve, reject) => {
-        const output = createWriteStream(zipPath)
-        const archive = archiver('zip', { zlib: { level: 9 } })
-        output.on('close', resolve)
-        archive.on('error', reject)
-        archive.pipe(output)
-        for (const file of opts.files) {
-          archive.append(file.content, { name: file.path })
-        }
-        archive.finalize()
-      })
+        await new Promise<void>((resolve, reject) => {
+          const output = createWriteStream(zipPath)
+          const archive = archiver('zip', { zlib: { level: 9 } })
+          output.on('close', resolve)
+          archive.on('error', reject)
+          archive.pipe(output)
+          for (const file of opts.files) {
+            archive.append(file.content, { name: file.path })
+          }
+          archive.finalize()
+        })
 
-      // macOS clipboard: copy file reference via NSFilenamesPboardType
-      const plist = `<?xml version="1.0" encoding="UTF-8"?>
+        // macOS clipboard: copy file reference via NSFilenamesPboardType
+        const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><array><string>${zipPath}</string></array></plist>`
-      clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist))
+        clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist))
 
-      return { success: true, data: zipPath }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { success: false, error: message }
+        return { success: true, data: zipPath }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { success: false, error: message }
+      }
     }
-  })
+  )
 
   ipcMain.handle('update:check', async () => {
     try {

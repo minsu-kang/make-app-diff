@@ -33,13 +33,18 @@ const api = {
   showInFinder: (fullPath: string): Promise<void> => ipcRenderer.invoke('shell:show-in-finder', fullPath),
   editor: {
     openDiff: (opts: {
-      filePath: string; fromVersion: string; toVersion: string
-      oldContent: string; newContent: string
+      filePath: string
+      fromVersion: string
+      toVersion: string
+      oldContent: string
+      newContent: string
     }): Promise<IpcResult<void>> => ipcRenderer.invoke('editor:open-diff', opts)
   },
   clipboard: {
     copyZip: (opts: {
-      appName: string; version: string; files: { path: string; content: string }[]
+      appName: string
+      version: string
+      files: { path: string; content: string }[]
     }): Promise<IpcResult<string>> => ipcRenderer.invoke('clipboard:copy-zip', opts)
   },
   settings: {
