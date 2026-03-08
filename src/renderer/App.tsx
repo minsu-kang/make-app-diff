@@ -216,7 +216,9 @@ export default function App() {
               <button
                 className="update-banner-btn update-banner-brew"
                 onClick={() => {
-                  navigator.clipboard.writeText('osascript -e \'quit app "MakeDiff"\' && brew update && brew upgrade --cask makediff && open -a MakeDiff')
+                  navigator.clipboard.writeText(
+                    'osascript -e \'quit app "MakeDiff"\' && brew update && brew upgrade --cask makediff && open -a MakeDiff'
+                  )
                   showToast('Copied to clipboard', 'success')
                 }}
               >
