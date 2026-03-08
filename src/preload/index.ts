@@ -73,12 +73,14 @@ const api = {
       return () => ipcRenderer.removeListener('update:available', handler)
     },
     onUpToDate: (cb: () => void) => {
-      ipcRenderer.on('update:up-to-date', cb)
-      return () => ipcRenderer.removeListener('update:up-to-date', cb)
+      const handler = () => cb()
+      ipcRenderer.on('update:up-to-date', handler)
+      return () => ipcRenderer.removeListener('update:up-to-date', handler)
     },
     onError: (cb: () => void) => {
-      ipcRenderer.on('update:error', cb)
-      return () => ipcRenderer.removeListener('update:error', cb)
+      const handler = () => cb()
+      ipcRenderer.on('update:error', handler)
+      return () => ipcRenderer.removeListener('update:error', handler)
     }
   },
   ipm: {
