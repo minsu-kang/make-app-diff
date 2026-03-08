@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/minsu-kang/make-app-diff/compare/v1.3.0...v1.3.1) (2026-03-08)
+
+
+### Bug Fixes
+
+* disable File menu items until settings are validated ([0441fb9](https://github.com/minsu-kang/make-app-diff/commit/0441fb9511db69a2060a7120817147f7581f9531))
+* disable File menu items until settings are validated ([83b1630](https://github.com/minsu-kang/make-app-diff/commit/83b1630cb3ea6f4d4d8c5c00957192739cfe513e))
+
 ## [1.3.0](https://github.com/minsu-kang/make-app-diff/compare/v1.2.4...v1.3.0) (2026-03-08)
 
 
