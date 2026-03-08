@@ -23,7 +23,16 @@ vi.mock('electron-store', () => {
 })
 
 // Import after mock so the module-level `new Store()` uses our mock
-import { loadSettings, saveSettings, loadTheme, saveTheme } from '../storage'
+import {
+  loadSettings,
+  saveSettings,
+  loadTheme,
+  saveTheme,
+  loadFavorites,
+  saveFavorites,
+  loadRecentApps,
+  saveRecentApps
+} from '../storage'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -103,5 +112,47 @@ describe('saveTheme', () => {
   it('calls store.set with theme', () => {
     saveTheme('light')
     expect(mockSet).toHaveBeenCalledWith('theme', 'light')
+  })
+})
+
+describe('loadFavorites', () => {
+  it('returns stored favorites', () => {
+    const favorites = [{ name: 'google-drive', label: 'Google Drive', addedAt: 1704067200000 }]
+    mockGet.mockReturnValueOnce(favorites)
+    expect(loadFavorites()).toEqual(favorites)
+  })
+
+  it('returns empty array as default', () => {
+    mockGet.mockReturnValueOnce(undefined)
+    expect(loadFavorites()).toEqual([])
+  })
+})
+
+describe('saveFavorites', () => {
+  it('calls store.set with favorites', () => {
+    const favorites = [{ name: 'slack', label: 'Slack', addedAt: 1706745600000 }]
+    saveFavorites(favorites)
+    expect(mockSet).toHaveBeenCalledWith('favorites', favorites)
+  })
+})
+
+describe('loadRecentApps', () => {
+  it('returns stored recent apps', () => {
+    const recent = [{ name: 'github', label: 'GitHub', lastViewed: 1709251200000 }]
+    mockGet.mockReturnValueOnce(recent)
+    expect(loadRecentApps()).toEqual(recent)
+  })
+
+  it('returns empty array as default', () => {
+    mockGet.mockReturnValueOnce(undefined)
+    expect(loadRecentApps()).toEqual([])
+  })
+})
+
+describe('saveRecentApps', () => {
+  it('calls store.set with recentApps', () => {
+    const recent = [{ name: 'jira', label: 'Jira', lastViewed: 1711929600000 }]
+    saveRecentApps(recent)
+    expect(mockSet).toHaveBeenCalledWith('recentApps', recent)
   })
 })
