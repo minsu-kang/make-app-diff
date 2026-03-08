@@ -17,8 +17,9 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     },
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 15, y: 10 }
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 15, y: 10 } }
+      : {})
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

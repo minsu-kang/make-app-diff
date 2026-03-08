@@ -2,7 +2,7 @@
 
 Desktop app for viewing diffs between Make.com app versions. Downloads PKR archives from the IPM API, extracts files, and renders side-by-side diffs with full file context.
 
-Built with Electron + React + TypeScript for macOS.
+Built with Electron + React + TypeScript for macOS and Windows.
 
 ## Features
 
@@ -15,10 +15,13 @@ Built with Electron + React + TypeScript for macOS.
 - **Dependency diffing** — Automatically downloads and diffs account/hook dependencies from manifests
 - **Three themes** — Dark (default), Make (purple), Light (Apple-inspired)
 - **App download** — Download any app version to a local folder in SDK structure
+- **Update notification** — Checks GitHub Releases for new versions on startup
 
 ## Installation
 
-Download the latest DMG from the [Releases](https://github.com/minsu-kang/make-app-diff/releases) page.
+Download the latest release from the [Releases](https://github.com/minsu-kang/make-app-diff/releases) page:
+- **macOS** — `.dmg` file
+- **Windows** — `.exe` installer
 
 > **"MakeDiff is damaged" warning on macOS**
 >
