@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/minsu-kang/make-app-diff/compare/v1.2.4...v1.3.0) (2026-03-08)
+
+
+### Features
+
+* show brew upgrade button only on macOS and improve command ([beaf150](https://github.com/minsu-kang/make-app-diff/commit/beaf150e583071e92f6de87cfa3fe927220275ca))
+
+
+### Bug Fixes
+
+* format App.tsx with Prettier ([710d88b](https://github.com/minsu-kang/make-app-diff/commit/710d88b39ebe0dec43415309cadee29c80ca8416))
+* show brew upgrade button only on macOS and improve command ([9c2fb84](https://github.com/minsu-kang/make-app-diff/commit/9c2fb840b15a024be3f594def858adb0b30b2509))
+
 ## [1.2.4](https://github.com/minsu-kang/make-app-diff/compare/v1.2.3...v1.2.4) (2026-03-08)
 
 
