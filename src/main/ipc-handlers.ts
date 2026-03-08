@@ -3,7 +3,7 @@ import * as fs from 'fs/promises'
 import { createWriteStream } from 'fs'
 import * as path from 'path'
 import { tmpdir } from 'os'
-import { exec } from 'child_process'
+import { exec, execFile } from 'child_process'
 import archiver from 'archiver'
 import { enableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
@@ -338,11 +338,30 @@ export function registerIpcHandlers(): void {
           archive.finalize()
         })
 
-        // macOS clipboard: copy file reference via NSFilenamesPboardType
-        const plist = `<?xml version="1.0" encoding="UTF-8"?>
+        if (process.platform === 'darwin') {
+          // macOS clipboard: copy file reference via NSFilenamesPboardType
+          const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><array><string>${zipPath}</string></array></plist>`
-        clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist))
+          clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist))
+        } else {
+          // Windows clipboard: use PowerShell + .NET to set CF_HDROP file drop list
+          const escaped = zipPath.replace(/'/g, "''")
+          const command = [
+            'Add-Type -AssemblyName System.Windows.Forms',
+            '$col = New-Object System.Collections.Specialized.StringCollection',
+            `$null = $col.Add('${escaped}')`,
+            '[System.Windows.Forms.Clipboard]::SetFileDropList($col)'
+          ].join('; ')
+          await new Promise<void>((resolve, reject) => {
+            execFile(
+              'powershell.exe',
+              ['-NoProfile', '-NonInteractive', '-Command', command],
+              { windowsHide: true },
+              (err) => (err ? reject(err) : resolve())
+            )
+          })
+        }
 
         return { success: true, data: zipPath }
       } catch (error: unknown) {
