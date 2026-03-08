@@ -212,6 +212,15 @@ export default function App() {
             <button className="update-banner-btn" onClick={() => window.api.update.openRelease(updateVersion!)}>
               Download
             </button>
+            <button
+              className="update-banner-btn update-banner-brew"
+              onClick={() => {
+                navigator.clipboard.writeText('brew upgrade --cask --no-quarantine makediff')
+                showToast('Copied to clipboard', 'success')
+              }}
+            >
+              brew upgrade
+            </button>
             <button className="update-banner-dismiss" onClick={() => setUpdateVersion(null)}>
               &#10005;
             </button>
