@@ -7,7 +7,7 @@ import VersionSelector from './components/VersionSelector'
 import ComponentTabs from './components/ComponentTabs'
 import FileTree from './components/FileTree'
 import DiffViewer from './components/DiffViewer'
-import ToastContainer from './components/Toast'
+import ToastContainer, { showToast } from './components/Toast'
 
 type TabType = 'app' | 'account' | 'hook'
 
@@ -48,10 +48,20 @@ export default function App() {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
 
   useEffect(() => {
-    const cleanup = window.api.update.onAvailable((version) => {
+    const cleanupAvailable = window.api.update.onAvailable((version) => {
       setUpdateVersion(version)
     })
-    return cleanup
+    const cleanupUpToDate = window.api.update.onUpToDate(() => {
+      showToast('You are on the latest version', 'success')
+    })
+    const cleanupError = window.api.update.onError(() => {
+      showToast('Could not check for updates', 'error')
+    })
+    return () => {
+      cleanupAvailable()
+      cleanupUpToDate()
+      cleanupError()
+    }
   }, [])
 
   useEffect(() => {
@@ -186,17 +196,6 @@ export default function App() {
 
   return (
     <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      {updateVersion && (
-        <div className="update-banner">
-          <span>v{updateVersion} available</span>
-          <button className="update-banner-btn" onClick={() => window.api.update.openRelease()}>
-            Download
-          </button>
-          <button className="update-banner-dismiss" onClick={() => setUpdateVersion(null)}>
-            &#10005;
-          </button>
-        </div>
-      )}
       {!sidebarCollapsed && (
         <Sidebar
           onAppSelect={handleAppSelect}
@@ -207,6 +206,17 @@ export default function App() {
       )}
 
       <main className="main-content">
+        {updateVersion && (
+          <div className="update-banner">
+            <span>v{updateVersion} available</span>
+            <button className="update-banner-btn" onClick={() => window.api.update.openRelease(updateVersion!)}>
+              Download
+            </button>
+            <button className="update-banner-dismiss" onClick={() => setUpdateVersion(null)}>
+              &#10005;
+            </button>
+          </div>
+        )}
         <div className="main-top-bar">
           <button
             className="sidebar-toggle"

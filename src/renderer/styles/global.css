@@ -1545,10 +1545,7 @@ td.d2h-emptyplaceholder {
 
 /* Update Banner */
 .update-banner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  width: 100%;
   height: 32px;
   display: flex;
   align-items: center;
@@ -1558,8 +1555,8 @@ td.d2h-emptyplaceholder {
   color: #fff;
   font-size: 12px;
   font-weight: 500;
-  z-index: 300;
-  -webkit-app-region: drag;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 
 .update-banner-btn {

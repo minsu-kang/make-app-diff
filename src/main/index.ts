@@ -40,7 +40,7 @@ function createWindow(): void {
   }
 }
 
-export async function checkForUpdates(mainWindow: BrowserWindow): Promise<void> {
+export async function checkForUpdates(mainWindow: BrowserWindow, manual = false): Promise<void> {
   try {
     const { data } = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`, {
       headers: { Accept: 'application/vnd.github.v3+json' },
@@ -50,9 +50,13 @@ export async function checkForUpdates(mainWindow: BrowserWindow): Promise<void> 
     const current = app.getVersion()
     if (latest !== current) {
       mainWindow.webContents.send('update:available', latest)
+    } else if (manual) {
+      mainWindow.webContents.send('update:up-to-date')
     }
   } catch {
-    /* silently ignore — offline or no releases yet */
+    if (manual) {
+      mainWindow.webContents.send('update:error')
+    }
   }
 }
 
@@ -80,7 +84,7 @@ function buildMenu(mainWindow: BrowserWindow): void {
         { type: 'separator' },
         {
           label: 'Check for Updates',
-          click: () => checkForUpdates(mainWindow)
+          click: () => checkForUpdates(mainWindow, true)
         },
         { type: 'separator' },
         { role: 'close' }

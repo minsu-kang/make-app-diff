@@ -12,5 +12,12 @@ reviews:
       instructions: 'React UI code. No Node.js APIs. Check for proper state management and CSS variable usage.'
     - path: '.github/workflows/**'
       instructions: 'CI/CD workflows. Check for security best practices and proper secret handling.'
+  tools:
+    biome:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
 chat:
   auto_reply: true

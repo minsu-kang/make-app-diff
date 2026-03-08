@@ -66,11 +66,21 @@ const api = {
   },
   update: {
     check: (): Promise<IpcResult<void>> => ipcRenderer.invoke('update:check'),
-    openRelease: (): Promise<void> => ipcRenderer.invoke('update:open-release'),
+    openRelease: (version: string): Promise<IpcResult<void>> => ipcRenderer.invoke('update:open-release', version),
     onAvailable: (cb: (version: string) => void) => {
       const handler = (_: Electron.IpcRendererEvent, version: string) => cb(version)
       ipcRenderer.on('update:available', handler)
       return () => ipcRenderer.removeListener('update:available', handler)
+    },
+    onUpToDate: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('update:up-to-date', handler)
+      return () => ipcRenderer.removeListener('update:up-to-date', handler)
+    },
+    onError: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('update:error', handler)
+      return () => ipcRenderer.removeListener('update:error', handler)
     }
   },
   ipm: {
