@@ -5,6 +5,7 @@ import * as path from 'path'
 import { tmpdir } from 'os'
 import { exec } from 'child_process'
 import archiver from 'archiver'
+import { enableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
 import { extractPkr } from './services/pkr-extractor'
 import { computeDiff } from './services/diff-service'
@@ -91,6 +92,7 @@ export function registerIpcHandlers(): void {
     }
     saveSettings(settings)
     ipmClient.updateSettings(settings)
+    enableMenuItems()
     return { success: true }
   })
 
