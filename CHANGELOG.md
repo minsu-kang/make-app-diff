@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/minsu-kang/make-app-diff/compare/v1.0.0...v1.1.0) (2026-03-08)
+
+
+### Features
+
+* add update version check notification ([e87c373](https://github.com/minsu-kang/make-app-diff/commit/e87c3730dd1838f94a168818e606feb7abf44664))
+* various UI/UX improvements and new features ([c08a032](https://github.com/minsu-kang/make-app-diff/commit/c08a032a84a7e58cb6e76755f20b145e7e160b65))
+
 ## v1.0.0
 
 ### Core Features
