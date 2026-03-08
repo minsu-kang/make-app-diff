@@ -1,12 +1,66 @@
-import { ipcMain, dialog, shell } from 'electron'
-import * as fs from 'fs'
+import { ipcMain, dialog, shell, clipboard, BrowserWindow } from 'electron'
+import * as fs from 'fs/promises'
+import { createWriteStream } from 'fs'
 import * as path from 'path'
+import { tmpdir } from 'os'
+import { exec } from 'child_process'
+import archiver from 'archiver'
 import { IpmClient } from './services/ipm-client'
 import { extractPkr } from './services/pkr-extractor'
 import { computeDiff } from './services/diff-service'
-import { loadSettings, saveSettings, loadTheme, saveTheme } from './services/storage'
+import {
+  loadSettings,
+  saveSettings,
+  loadTheme,
+  saveTheme,
+  loadFavorites,
+  saveFavorites,
+  loadRecentApps,
+  saveRecentApps
+} from './services/storage'
 import { isCustomApp, decompileApp, decompileAccount, decompileHook } from './services/decompiler'
 import { IpmSettings, ComponentType, ExtractedFile } from './types'
+
+function sanitizePath(baseDir: string, filePath: string): string {
+  const normalized = path.normalize(filePath)
+  if (path.isAbsolute(normalized) || normalized.startsWith('..')) {
+    throw new Error(`Invalid file path: ${filePath}`)
+  }
+  const resolved = path.join(baseDir, normalized)
+  if (!resolved.startsWith(baseDir + path.sep) && resolved !== baseDir) {
+    throw new Error(`Path traversal detected: ${filePath}`)
+  }
+  return resolved
+}
+
+async function downloadDepsForVersion(
+  client: IpmClient,
+  depNames: string[],
+  version: string,
+  depType: 'account' | 'hook',
+  isCustom: boolean
+): Promise<ExtractedFile[]> {
+  const decompileFn = depType === 'account' ? decompileAccount : decompileHook
+  const compiledFolder = depType === 'account' ? 'accounts' : 'hooks'
+  const sdkFolder = depType === 'account' ? 'connections' : 'webhooks'
+  const results: ExtractedFile[] = []
+
+  await Promise.all(
+    depNames.map(async (depName) => {
+      try {
+        const buffer = await client.downloadDependencyComponent(depName, version, depType)
+        let files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
+        const folder = isCustom ? sdkFolder : compiledFolder
+        if (isCustom) files = decompileFn(files)
+        results.push(...files.map((f) => ({ ...f, path: `${folder}/${depName}/${f.path}` })))
+      } catch {
+        /* skip */
+      }
+    })
+  )
+
+  return results
+}
 
 let ipmClient: IpmClient
 
@@ -54,14 +108,12 @@ export function registerIpcHandlers(): void {
     try {
       const info = await ipmClient.getAppInfo(appName)
       const manifest = await ipmClient.getManifest(appName, info.version)
-      const m = manifest as Record<string, unknown>
-      info.label = (m.label as string) || appName
+      info.label = ((manifest as Record<string, unknown>).label as string) || appName
 
       // Extract theme and iconHash from info.meta
-      const meta = info.meta as Record<string, unknown> | undefined
-      if (meta) {
-        if (meta.theme) info.theme = meta.theme as string
-        if (meta.iconHash) info.iconHash = meta.iconHash as string
+      if (info.meta) {
+        if (info.meta.theme) info.theme = info.meta.theme
+        if (info.meta.iconHash) info.iconHash = info.meta.iconHash
       }
 
       return { success: true, data: info }
@@ -116,44 +168,46 @@ export function registerIpcHandlers(): void {
       if (fromIsCustom) fromFiles = decompileApp(fromFiles, appName)
       if (toIsCustom) toFiles = decompileApp(toFiles, appName)
 
-      // Helper to download dependency files
-      async function downloadDeps(depType: 'account' | 'hook', compiledFolder: string, sdkFolder: string) {
-        const depKey = depType === 'account' ? 'accounts' : 'hooks'
-        const decompileFn = depType === 'account' ? decompileAccount : decompileHook
-        const fromDeps = fromManifest.dependencies?.[depKey] || []
-        const toDeps = toManifest.dependencies?.[depKey] || []
-        const allDeps = [...new Set([...fromDeps, ...toDeps])]
+      // Download dependencies for both versions in parallel
+      const fromAccounts = fromManifest.dependencies?.accounts || []
+      const toAccounts = toManifest.dependencies?.accounts || []
+      const fromHooks = fromManifest.dependencies?.hooks || []
+      const toHooks = toManifest.dependencies?.hooks || []
+      const allAccounts = [...new Set([...fromAccounts, ...toAccounts])]
+      const allHooks = [...new Set([...fromHooks, ...toHooks])]
 
-        await Promise.all(
-          allDeps.map(async (depName) => {
-            try {
-              if (fromDeps.includes(depName)) {
-                const buffer = await ipmClient.downloadDependencyComponent(depName, fromVersion, depType)
-                let files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
-                const folder = fromIsCustom ? sdkFolder : compiledFolder
-                if (fromIsCustom) files = decompileFn(files)
-                fromFiles.push(...files.map((f) => ({ ...f, path: `${folder}/${depName}/${f.path}` })))
-              }
-            } catch {
-              /* skip */
-            }
-            try {
-              if (toDeps.includes(depName)) {
-                const buffer = await ipmClient.downloadDependencyComponent(depName, toVersion, depType)
-                let files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
-                const folder = toIsCustom ? sdkFolder : compiledFolder
-                if (toIsCustom) files = decompileFn(files)
-                toFiles.push(...files.map((f) => ({ ...f, path: `${folder}/${depName}/${f.path}` })))
-              }
-            } catch {
-              /* skip */
-            }
-          })
+      const [fromAccFiles, toAccFiles, fromHookFiles, toHookFiles] = await Promise.all([
+        downloadDepsForVersion(
+          ipmClient,
+          allAccounts.filter((d) => fromAccounts.includes(d)),
+          fromVersion,
+          'account',
+          fromIsCustom
+        ),
+        downloadDepsForVersion(
+          ipmClient,
+          allAccounts.filter((d) => toAccounts.includes(d)),
+          toVersion,
+          'account',
+          toIsCustom
+        ),
+        downloadDepsForVersion(
+          ipmClient,
+          allHooks.filter((d) => fromHooks.includes(d)),
+          fromVersion,
+          'hook',
+          fromIsCustom
+        ),
+        downloadDepsForVersion(
+          ipmClient,
+          allHooks.filter((d) => toHooks.includes(d)),
+          toVersion,
+          'hook',
+          toIsCustom
         )
-      }
-
-      // Download accounts and hooks
-      await Promise.all([downloadDeps('account', 'accounts', 'connections'), downloadDeps('hook', 'hooks', 'webhooks')])
+      ])
+      fromFiles.push(...fromAccFiles, ...fromHookFiles)
+      toFiles.push(...toAccFiles, ...toHookFiles)
 
       const diffResult = computeDiff('app', fromFiles, toFiles)
       return { success: true, data: diffResult }
@@ -163,8 +217,136 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('ipm:show-version', async (_event, appName: string, version: string) => {
+    try {
+      const [appBuffer, manifest] = await Promise.all([
+        ipmClient.downloadComponent(appName, version, 'app'),
+        ipmClient.getManifest(appName, version)
+      ])
+
+      let files: ExtractedFile[] = extractPkr(appBuffer)
+      const isCustom = isCustomApp(files)
+      if (isCustom) files = decompileApp(files, appName)
+
+      // Download dependencies
+      const accounts = manifest.dependencies?.accounts || []
+      const hooks = manifest.dependencies?.hooks || []
+      const [accFiles, hookFiles] = await Promise.all([
+        downloadDepsForVersion(ipmClient, accounts, version, 'account', isCustom),
+        downloadDepsForVersion(ipmClient, hooks, version, 'hook', isCustom)
+      ])
+      files.push(...accFiles, ...hookFiles)
+
+      const diffResult = computeDiff('app', [], files)
+      return { success: true, data: diffResult }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
   ipcMain.handle('shell:show-in-finder', (_event, fullPath: string) => {
     shell.showItemInFolder(fullPath)
+  })
+
+  ipcMain.handle('favorites:load', () => {
+    return { success: true, data: loadFavorites() }
+  })
+
+  ipcMain.handle('favorites:save', (_event, favorites: FavoriteApp[]) => {
+    saveFavorites(favorites)
+    return { success: true }
+  })
+
+  ipcMain.handle('recent:load', () => {
+    return { success: true, data: loadRecentApps() }
+  })
+
+  ipcMain.handle('recent:add', (_event, name: string, label: string) => {
+    const recent = loadRecentApps().filter((r) => r.name !== name)
+    recent.unshift({ name, label, lastViewed: Date.now() })
+    const trimmed = recent.slice(0, 8)
+    saveRecentApps(trimmed)
+    return { success: true, data: trimmed }
+  })
+
+  ipcMain.handle('editor:open-diff', async (_event, opts: {
+    filePath: string; fromVersion: string; toVersion: string
+    oldContent: string; newContent: string
+  }) => {
+    try {
+      const tmpDir = path.join(tmpdir(), 'makediff')
+      await fs.mkdir(tmpDir, { recursive: true })
+
+      const ext = path.extname(opts.filePath)
+      const base = path.basename(opts.filePath, ext)
+      const oldFile = path.join(tmpDir, `${base}@${opts.fromVersion}${ext}`)
+      const newFile = path.join(tmpDir, `${base}@${opts.toVersion}${ext}`)
+
+      await fs.writeFile(oldFile, opts.oldContent, 'utf-8')
+      await fs.writeFile(newFile, opts.newContent, 'utf-8')
+
+      return new Promise((resolve) => {
+        exec(`code --diff "${oldFile}" "${newFile}"`, (err) => {
+          if (err) resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
+          else resolve({ success: true })
+        })
+      })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('clipboard:copy-zip', async (_event, opts: {
+    appName: string; version: string; files: { path: string; content: string }[]
+  }) => {
+    try {
+      const tmpDir = path.join(tmpdir(), 'makediff')
+      await fs.mkdir(tmpDir, { recursive: true })
+
+      const zipName = `${opts.appName}@${opts.version}.zip`
+      const zipPath = path.join(tmpDir, zipName)
+
+      await new Promise<void>((resolve, reject) => {
+        const output = createWriteStream(zipPath)
+        const archive = archiver('zip', { zlib: { level: 9 } })
+        output.on('close', resolve)
+        archive.on('error', reject)
+        archive.pipe(output)
+        for (const file of opts.files) {
+          archive.append(file.content, { name: file.path })
+        }
+        archive.finalize()
+      })
+
+      // macOS clipboard: copy file reference via NSFilenamesPboardType
+      const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><array><string>${zipPath}</string></array></plist>`
+      clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist))
+
+      return { success: true, data: zipPath }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('update:check', async () => {
+    try {
+      const { checkForUpdates } = await import('./index')
+      const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+      if (win) await checkForUpdates(win)
+      return { success: true }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('update:open-release', () => {
+    shell.openExternal('https://github.com/minsu-kang/make-app-diff/releases/latest')
   })
 
   ipcMain.handle('ipm:download-version', async (_event, appName: string, version: string) => {
@@ -193,54 +375,20 @@ export function registerIpcHandlers(): void {
         appFiles = decompileApp(appFiles, appName)
       }
 
-      for (const file of appFiles) {
-        const filePath = path.join(baseDir, file.path)
-        fs.mkdirSync(path.dirname(filePath), { recursive: true })
-        fs.writeFileSync(filePath, file.content, 'utf-8')
-      }
-
-      // Download accounts (custom apps → connections/ folder with decompilation)
+      // Download dependencies in parallel
       const accounts = manifest.dependencies?.accounts || []
-      for (const depName of accounts) {
-        try {
-          const buffer = await ipmClient.downloadDependencyComponent(depName, version, 'account')
-          let depFiles = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
-          const folder = isCustom ? 'connections' : 'accounts'
-
-          if (isCustom) {
-            depFiles = decompileAccount(depFiles)
-          }
-
-          for (const file of depFiles) {
-            const filePath = path.join(baseDir, folder, depName, file.path)
-            fs.mkdirSync(path.dirname(filePath), { recursive: true })
-            fs.writeFileSync(filePath, file.content, 'utf-8')
-          }
-        } catch {
-          /* skip */
-        }
-      }
-
-      // Download hooks (custom apps → webhooks/ folder with decompilation)
       const hooks = manifest.dependencies?.hooks || []
-      for (const depName of hooks) {
-        try {
-          const buffer = await ipmClient.downloadDependencyComponent(depName, version, 'hook')
-          let hookFiles = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
-          const hookFolder = isCustom ? 'webhooks' : 'hooks'
+      const [accFiles, hookFiles] = await Promise.all([
+        downloadDepsForVersion(ipmClient, accounts, version, 'account', isCustom),
+        downloadDepsForVersion(ipmClient, hooks, version, 'hook', isCustom)
+      ])
+      const allFiles = [...appFiles, ...accFiles, ...hookFiles]
 
-          if (isCustom) {
-            hookFiles = decompileHook(hookFiles)
-          }
-
-          for (const file of hookFiles) {
-            const filePath = path.join(baseDir, hookFolder, depName, file.path)
-            fs.mkdirSync(path.dirname(filePath), { recursive: true })
-            fs.writeFileSync(filePath, file.content, 'utf-8')
-          }
-        } catch {
-          /* skip */
-        }
+      // Write all files to disk
+      for (const file of allFiles) {
+        const filePath = sanitizePath(baseDir, file.path)
+        await fs.mkdir(path.dirname(filePath), { recursive: true })
+        await fs.writeFile(filePath, file.content, 'utf-8')
       }
 
       return { success: true, data: baseDir }

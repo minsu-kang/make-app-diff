@@ -1,7 +1,11 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import axios from 'axios'
 import { registerIpcHandlers } from './ipc-handlers'
+
+const REPO_OWNER = 'minsu-kang'
+const REPO_NAME = 'make-app-diff'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -18,16 +22,36 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    const url = new URL(details.url)
+    if (url.protocol === 'https:' || url.protocol === 'http:') {
+      shell.openExternal(details.url)
+    }
     return { action: 'deny' }
   })
 
   buildMenu(mainWindow)
+  checkForUpdates(mainWindow)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+export async function checkForUpdates(mainWindow: BrowserWindow): Promise<void> {
+  try {
+    const { data } = await axios.get(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
+      { headers: { Accept: 'application/vnd.github.v3+json' }, timeout: 10000 }
+    )
+    const latest = (data.tag_name as string).replace(/^v/, '')
+    const current = app.getVersion()
+    if (latest !== current) {
+      mainWindow.webContents.send('update:available', latest)
+    }
+  } catch {
+    /* silently ignore — offline or no releases yet */
   }
 }
 
@@ -51,6 +75,11 @@ function buildMenu(mainWindow: BrowserWindow): void {
           label: 'About',
           accelerator: 'CmdOrCtrl+I',
           click: () => mainWindow.webContents.send('menu:show-info')
+        },
+        { type: 'separator' },
+        {
+          label: 'Check for Updates',
+          click: () => checkForUpdates(mainWindow)
         },
         { type: 'separator' },
         { role: 'close' }
