@@ -19,11 +19,21 @@ Built with Electron + React + TypeScript for macOS and Windows.
 
 ## Installation
 
+### Homebrew (macOS, recommended)
+
+```bash
+brew install --cask --no-quarantine minsu-kang/makediff/makediff
+```
+
+The `--no-quarantine` flag skips Gatekeeper checks, allowing the unsigned app to launch without the `xattr -cr` workaround.
+
+### Manual Download
+
 Download the latest release from the [Releases](https://github.com/minsu-kang/make-app-diff/releases) page:
 - **macOS** — `.dmg` file
 - **Windows** — `.exe` installer
 
-> **"MakeDiff is damaged" warning on macOS**
+> **"MakeDiff is damaged" warning on macOS (manual install only)**
 >
 > The app is not code-signed, so macOS Gatekeeper will block it. Run the following in Terminal:
 > ```bash
