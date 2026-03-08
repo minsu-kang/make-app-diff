@@ -18,21 +18,26 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: ${{ !startsWith(github.head_ref, 'release-please--') }}
         with:
           node-version: 20
           cache: npm
 
       - run: npm ci
+        if: ${{ !startsWith(github.head_ref, 'release-please--') }}
 
       - name: Lint
+        if: ${{ !startsWith(github.head_ref, 'release-please--') }}
         run: npm run lint
 
       - name: Format check
+        if: ${{ !startsWith(github.head_ref, 'release-please--') }}
         run: npm run format:check
 
       - name: Test with coverage
+        if: ${{ !startsWith(github.head_ref, 'release-please--') }}
         run: npm run test:coverage
 
       - name: Coverage report
-        if: github.event_name == 'pull_request'
+        if: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release-please--') }}
         uses: davelosert/vitest-coverage-report-action@v2
