@@ -65,14 +65,20 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 | `ipm:get-diff` | `appName, from, to` | `IpcResult<DiffResult>` |
 | `ipm:get-app-icon` | `appName` | `IpcResult<string>` (data URL) |
 | `ipm:download-version` | `appName, version` | `IpcResult<string>` (dir path) |
+| `ipm:show-version` | `appName, version` | `IpcResult<DiffResult>` |
+| `shell:show-in-finder` | `fullPath` | `void` |
+| `favorites:load` | — | `IpcResult<FavoriteApp[]>` |
+| `favorites:save` | `FavoriteApp[]` | `{ success }` |
+| `recent:load` | — | `IpcResult<RecentApp[]>` |
+| `recent:add` | `name, label` | `IpcResult<RecentApp[]>` |
 
 **Menu events:** `menu:download-app`, `menu:open-settings`, `menu:show-info`
 
 ## Preload Exposed Objects
 
-- `window.api` — IPC interface (`settings`, `theme`, `ipm` namespaces)
+- `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `showInFinder` namespaces)
 - `window.appVersion` — `{ app, electron, chrome, node }`
-- `window.onMenu` — `{ downloadApp, openSettings, showInfo }` callback registration
+- `window.onMenu` — `{ downloadApp, openSettings, showInfo }` callback registration (each returns cleanup function)
 
 ## Data Flow Patterns
 
@@ -126,15 +132,22 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 
 ## Type System
 
-**Key types (`src/main/types.ts`):**
+**Key types (`src/main/types.ts`):** All shared types are defined here and re-exported via `src/preload/index.ts`.
+- `IpcResult<T>` — `{ success, data?, error? }` — standard IPC response wrapper
 - `IpmSettings` — host, ipmToken, ipmeToken, env, ipmVersion
-- `AppInfo` — name, label, description, version, versions + `[key: string]: unknown`
-  - `meta` object contains: `theme` (hex color), `iconHash` (SHA-1), `label`, `tag`, `enabled`
-- `AppManifest` — dependencies `{ accounts[], hooks[], keys[] }`
+- `AppInfo` — name, label, description, version, versions, theme?, iconHash?, meta?
+  - `meta` object contains: `theme` (hex color), `iconHash` (SHA-1), `label`, `tag` (`VersionTags`), `enabled`
+- `AppManifest` — dependencies? `{ accounts[], hooks[], keys[] }`
 - `ComponentType` — `'app' | 'account' | 'hook'`
 - `ExtractedFile` — `{ path, content }`
+- `ExtractedComponent` — `{ type: ComponentType, files: ExtractedFile[] }`
 - `FileDiff` — `{ filePath, status, oldContent, newContent, unifiedDiff }`
 - `DiffResult` — `{ type, diffs[], summary { added, deleted, modified, unchanged } }`
+- `FavoriteApp` — `{ name, label, addedAt }`
+- `RecentApp` — `{ name, label, lastViewed }`
+- `VersionTags` — `{ staging[], production[], stable[] }`
+- `SearchApp` — `{ name, label, version, availableVersions[] }`
+- `SearchEntry` — `{ app: SearchApp, major, versions[] }`
 
 ## Code Style
 
@@ -152,6 +165,12 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - `.sidebar-*`, `.search-*`, `.btn-*`, `.version-*`
 - `.tab-*`, `.tree-*`, `.file-tree-*`, `.diff-*`
 - `.settings-*`, `.info-*`, `.download-*`
+- `.code-*` for code viewer (show mode)
+- `.toast-*` for toast notifications
+- `.media-*` for image previews
+- `.json-path-*` for JSON path annotations
+- `.app-*` for app info/icon elements
+- `.empty-state-*` for landing page
 - `.d2h-*` for diff2html overrides
 
 **Rules:**
@@ -206,6 +225,37 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Copy handler strips empty placeholder rows (no blank lines from the other side)
 - `tab-size: 2` for compact indentation
 - `user-select: text` overrides global `user-select: none`
+
+### Sidebar (`Sidebar.tsx`)
+- Search input with Cmd+K focus shortcut
+- Favorites (star toggle) and Recents sections (collapsible)
+- Version grouping by major version number
+
+### VersionSelector (`VersionSelector.tsx`)
+- From/To dropdowns with swap button, Compare button (Cmd+Enter)
+- Inline download row with Show and Download buttons
+- Version timeline toggle
+
+### VersionTimeline (`VersionTimeline.tsx`)
+- Horizontal timeline with drag-to-select from/to nodes
+- Groups by major version, shows environment tags (staging/production/stable)
+- Range highlighting between from and to
+
+### ComponentTabs (`ComponentTabs.tsx`)
+- App / Connection / Webhook tabs with colored change count badges
+
+### DownloadModal (`DownloadModal.tsx`)
+- Search + select app, pick version, download to folder
+- Success state with Show in Finder action
+
+### Settings (`Settings.tsx`)
+- Connection (host, token), Appearance (theme picker), Advanced (IPM version)
+- Dirty state tracking with discard warning; theme reverts on discard
+- Enter saves, Escape closes (with dirty check)
+
+### Toast (`Toast.tsx`)
+- Global toast notifications via `showToast(text, type)` function
+- Auto-dismiss after 4s, supports error/success/info types
 
 ### diff2html Overrides
 - Compact line numbers (32px), minimal prefix/padding

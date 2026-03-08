@@ -139,6 +139,9 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
     result.push(makeFile('base.imljson', baseConfig))
   }
 
+  // Store cleaned module APIs for epoch deduplication
+  const moduleCleanedApis: Record<string, unknown> = {}
+
   // Generate module files
   for (const mod of modules) {
     const prefix = `modules/${mod.name}`
@@ -156,9 +159,9 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
     modMeta.type = mod.type
     result.push(makeFile(`${prefix}/metadata.json`, modMeta))
 
-    // expect.imljson — only for actions/searches (not instant triggers)
+    // expect.imljson — only for actions/searches (not triggers)
     const params = mod.rawItem.parameters as unknown[] | undefined
-    if (!isInstantTrigger) {
+    if (!isInstantTrigger && mod.type !== 'trigger') {
       let expect: unknown = []
       if (params && params.length > 0) {
         const fp = params[0] as Record<string, unknown> | undefined
@@ -185,6 +188,7 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
 
     // api.imljson — from app.js, unwrap communication, minus base fields
     const apiData = cleanApi(moduleApis[mod.name] || {}, baseConfig)
+    moduleCleanedApis[mod.name] = apiData
     result.push(makeFile(`${prefix}/api.imljson`, apiData))
 
     // parameters.imljson
@@ -201,6 +205,20 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
         }
       }
       result.push(makeFile(`${prefix}/parameters.imljson`, triggerParams))
+    } else if (mod.type === 'trigger') {
+      // For regular triggers, params come from __IMTCONN__ options.nested
+      let triggerParams: unknown = []
+      if (params && params.length > 0) {
+        const fp = params[0] as Record<string, unknown> | undefined
+        if (fp?.name === '__IMTCONN__') {
+          const options = fp.options as Record<string, unknown> | undefined
+          if (Array.isArray(options?.nested) && (options!.nested as unknown[]).length > 0) {
+            triggerParams = options!.nested
+          }
+        }
+      }
+      const paramsStr = transformRpcReferences(stringify(triggerParams), appName)
+      result.push({ path: `${prefix}/parameters.imljson`, content: paramsStr })
     } else {
       result.push({ path: `${prefix}/parameters.imljson`, content: '[]' })
     }
@@ -211,6 +229,39 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
 
   // Generate RPC files
   for (const [name, api] of Object.entries(rpcApis)) {
+    // RPC names like "epoch:WatchBoardItemsV2" → modules/WatchBoardItemsV2/epoch.imljson
+    if (name.includes(':')) {
+      const colonIdx = name.indexOf(':')
+      const fileBase = name.substring(0, colonIdx)
+      const moduleName = name.substring(colonIdx + 1)
+      const cleaned = cleanApi(api, baseConfig)
+
+      // Remove fields identical to the module's api.imljson (deep)
+      const modApi = moduleCleanedApis[moduleName]
+      let epochData = cleaned
+      if (modApi && isPlainObj(modApi) && isPlainObj(cleaned)) {
+        epochData = removeCommonFields(cleaned, modApi)
+      } else if (Array.isArray(modApi) && Array.isArray(cleaned)) {
+        const deduped = cleaned.map((item, i) => {
+          const modItem = modApi[i]
+          if (isPlainObj(item) && isPlainObj(modItem)) {
+            return removeCommonFields(item as Record<string, unknown>, modItem as Record<string, unknown>)
+          }
+          return item
+        })
+        // If all elements are identical, collapse to single object
+        if (deduped.length > 1 && deduped.every((el) => JSON.stringify(el) === JSON.stringify(deduped[0]))) {
+          epochData = deduped[0]
+        } else {
+          epochData = deduped
+        }
+      }
+
+      const content = transformRpcReferences(stringify(epochData), appName)
+      result.push({ path: `modules/${moduleName}/${fileBase}.imljson`, content })
+      continue
+    }
+
     const prefix = `rpcs/${name}`
     result.push(
       makeFile(`${prefix}/metadata.json`, {
@@ -679,6 +730,36 @@ function camelToLabel(name: string): string {
     .trim()
     .split(' ')
   return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+function isPlainObj(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val)
+}
+
+/**
+ * Recursively remove fields from `epoch` that are identical to `modApi`.
+ * For nested objects, recurse and keep only differing sub-fields.
+ */
+function removeCommonFields(
+  epoch: Record<string, unknown>,
+  modApi: Record<string, unknown>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(epoch)) {
+    if (!(key in modApi)) {
+      result[key] = value
+      continue
+    }
+    const modValue = modApi[key]
+    if (JSON.stringify(value) === JSON.stringify(modValue)) continue
+    if (isPlainObj(value) && isPlainObj(modValue)) {
+      const nested = removeCommonFields(value, modValue)
+      if (Object.keys(nested).length > 0) result[key] = nested
+      continue
+    }
+    result[key] = value
+  }
+  return result
 }
 
 function noop(): void {}

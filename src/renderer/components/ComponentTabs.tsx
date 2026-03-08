@@ -19,10 +19,7 @@ export default function ComponentTabs({ activeTab, onTabChange, summaries }: Com
     <div className="component-tabs">
       {tabs.map((tab) => {
         const summary = summaries[tab.key]
-        const badge =
-          summary && summary.added + summary.deleted + summary.modified > 0
-            ? summary.added + summary.deleted + summary.modified
-            : null
+        const hasChanges = summary && summary.added + summary.deleted + summary.modified > 0
 
         return (
           <button
@@ -31,7 +28,13 @@ export default function ComponentTabs({ activeTab, onTabChange, summaries }: Com
             onClick={() => onTabChange(tab.key)}
           >
             {tab.label}
-            {badge !== null && <span className="tab-badge">{badge}</span>}
+            {hasChanges && (
+              <span className="tab-badges">
+                {summary.added > 0 && <span className="tab-badge-add">+{summary.added}</span>}
+                {summary.deleted > 0 && <span className="tab-badge-del">-{summary.deleted}</span>}
+                {summary.modified > 0 && <span className="tab-badge-mod">~{summary.modified}</span>}
+              </span>
+            )}
           </button>
         )
       })}

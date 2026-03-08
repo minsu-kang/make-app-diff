@@ -1,9 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-
-interface FileDiff {
-  filePath: string
-  status: 'added' | 'deleted' | 'modified' | 'unchanged'
-}
+import type { FileDiff } from '../../preload/index'
 
 interface FileTreeProps {
   diffs: FileDiff[]
@@ -12,6 +8,7 @@ interface FileTreeProps {
   appName?: string
   fromVersion?: string
   toVersion?: string
+  viewMode?: 'diff' | 'show'
 }
 
 const statusColors: Record<string, string> = {
@@ -167,7 +164,8 @@ export default function FileTree({
   onFileSelect,
   appName,
   fromVersion,
-  toVersion
+  toVersion,
+  viewMode = 'diff'
 }: FileTreeProps) {
   const [panelWidth, setPanelWidth] = useState(280)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
@@ -227,7 +225,7 @@ export default function FileTree({
 
   return (
     <div className="file-tree" style={{ width: panelWidth }}>
-      {appName && fromVersion && toVersion && (
+      {viewMode === 'diff' && appName && fromVersion && toVersion && (
         <div className="file-tree-info">
           <span className="file-tree-app-name">{appName}</span>
           <span className="file-tree-versions">
@@ -235,7 +233,9 @@ export default function FileTree({
           </span>
         </div>
       )}
-      <div className="file-tree-header">Changed files ({diffs.length})</div>
+      <div className="file-tree-header">
+        {viewMode === 'show' ? 'Files' : 'Changed files'} ({diffs.length})
+      </div>
       <ul className="file-list">
         {flatItems.map((item) => {
           const isSelected = !item.isFolder && item.diff && selectedFile === item.diff.filePath

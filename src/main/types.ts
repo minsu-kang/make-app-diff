@@ -1,3 +1,9 @@
+export interface IpcResult<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
 export interface IpmSettings {
   host: string
   ipmToken: string
@@ -12,11 +18,20 @@ export interface AppInfo {
   description: string
   version: string
   versions: string[]
+  theme?: string
+  iconHash?: string
+  meta?: {
+    theme?: string
+    iconHash?: string
+    label?: string
+    tag?: VersionTags
+    enabled?: boolean
+  }
   [key: string]: unknown
 }
 
 export interface AppManifest {
-  dependencies: {
+  dependencies?: {
     accounts: string[]
     hooks: string[]
     keys: string[]
@@ -61,4 +76,35 @@ export interface DiffResult {
     modified: number
     unchanged: number
   }
+}
+
+export interface FavoriteApp {
+  name: string
+  label: string
+  addedAt: number
+}
+
+export interface RecentApp {
+  name: string
+  label: string
+  lastViewed: number
+}
+
+export interface VersionTags {
+  staging: string[]
+  production: string[]
+  stable: string[]
+}
+
+export interface SearchApp {
+  name: string
+  label: string
+  version: string
+  availableVersions: string[]
+}
+
+export interface SearchEntry {
+  app: SearchApp
+  major: number
+  versions: string[]
 }

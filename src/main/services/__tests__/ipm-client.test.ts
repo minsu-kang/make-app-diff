@@ -29,6 +29,7 @@ describe('IpmClient constructor', () => {
     new IpmClient(makeSettings())
     expect(mockAxiosCreate).toHaveBeenCalledWith({
       baseURL: 'https://ipm.integromat.com',
+      timeout: 30000,
       headers: {
         'x-imt-token': 'token-prod',
         'x-imt-ipm-version': '3.20.0',

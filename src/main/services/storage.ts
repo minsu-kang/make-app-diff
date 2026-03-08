@@ -1,9 +1,11 @@
 import Store from 'electron-store'
-import { IpmSettings } from '../types'
+import { IpmSettings, FavoriteApp, RecentApp } from '../types'
 
 interface StoreSchema {
   settings: IpmSettings
   theme: string
+  favorites: FavoriteApp[]
+  recentApps: RecentApp[]
 }
 
 const defaults: StoreSchema = {
@@ -14,7 +16,9 @@ const defaults: StoreSchema = {
     env: 'staging',
     ipmVersion: '3.20.0'
   },
-  theme: 'dark'
+  theme: 'dark',
+  favorites: [],
+  recentApps: []
 }
 
 const store = new Store<StoreSchema>({ defaults })
@@ -40,4 +44,20 @@ export function loadTheme(): string {
 
 export function saveTheme(theme: string): void {
   store.set('theme', theme)
+}
+
+export function loadFavorites(): FavoriteApp[] {
+  return store.get('favorites') || []
+}
+
+export function saveFavorites(favorites: FavoriteApp[]): void {
+  store.set('favorites', favorites)
+}
+
+export function loadRecentApps(): RecentApp[] {
+  return store.get('recentApps') || []
+}
+
+export function saveRecentApps(recent: RecentApp[]): void {
+  store.set('recentApps', recent)
 }

@@ -15,6 +15,7 @@ export class IpmClient {
   private createClient(settings: IpmSettings): AxiosInstance {
     return axios.create({
       baseURL: `https://${settings.host}`,
+      timeout: 30000,
       headers: {
         'x-imt-token': getActiveToken(settings),
         'x-imt-ipm-version': settings.ipmVersion || '3.20.0',
@@ -72,12 +73,7 @@ export class IpmClient {
   }
 
   async downloadComponent(appName: string, version: string, type: ComponentType): Promise<Buffer> {
-    const pathMap: Record<ComponentType, string> = {
-      app: 'app',
-      account: 'account',
-      hook: 'hook'
-    }
-    const response = await this.client.get(`/v3/sync/${pathMap[type]}/${appName}/${version}`, {
+    const response = await this.client.get(`/v3/sync/${type}/${appName}/${version}`, {
       responseType: 'arraybuffer'
     })
     return Buffer.from(response.data)

@@ -15,17 +15,25 @@ export function showToast(text: string, type: ToastMessage['type'] = 'error') {
 
 export default function ToastContainer() {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const timersRef = React.useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 
   useEffect(() => {
+    const timers = timersRef.current
     addToastFn = (msg) => {
       const id = ++toastId
       setToasts((prev) => [...prev, { ...msg, id }])
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id))
+        timers.delete(id)
       }, 4000)
+      timers.set(id, timer)
     }
     return () => {
       addToastFn = null
+      for (const timer of timers.values()) {
+        clearTimeout(timer)
+      }
+      timers.clear()
     }
   }, [])
 

@@ -13,9 +13,16 @@ Electron desktop app for viewing diffs between Make.com app versions.
 ## Commands
 
 ```bash
-npm run dev      # Start dev server
-npm run build    # Production build
-npm run preview  # Preview built app
+npm run dev          # Start dev server
+npm run build        # Production build
+npm run preview      # Preview built app
+npm run lint         # Run ESLint
+npm run lint:fix     # Run ESLint with auto-fix
+npm run format       # Format code with Prettier
+npm run format:check # Check formatting
+npm run test         # Run tests (vitest)
+npm run test:watch   # Run tests in watch mode
+npm run postinstall  # Install Electron app deps (runs automatically)
 ```
 
 ## Architecture
