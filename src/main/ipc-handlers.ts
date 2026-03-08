@@ -354,7 +354,7 @@ export function registerIpcHandlers(): void {
     try {
       const { checkForUpdates } = await import('./index')
       const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
-      if (win) await checkForUpdates(win)
+      if (win) await checkForUpdates(win, true)
       return { success: true }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)

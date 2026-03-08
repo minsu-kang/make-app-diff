@@ -71,6 +71,14 @@ const api = {
       const handler = (_: Electron.IpcRendererEvent, version: string) => cb(version)
       ipcRenderer.on('update:available', handler)
       return () => ipcRenderer.removeListener('update:available', handler)
+    },
+    onUpToDate: (cb: () => void) => {
+      ipcRenderer.on('update:up-to-date', cb)
+      return () => ipcRenderer.removeListener('update:up-to-date', cb)
+    },
+    onError: (cb: () => void) => {
+      ipcRenderer.on('update:error', cb)
+      return () => ipcRenderer.removeListener('update:error', cb)
     }
   },
   ipm: {
