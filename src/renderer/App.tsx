@@ -196,17 +196,6 @@ export default function App() {
 
   return (
     <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      {updateVersion && (
-        <div className="update-banner">
-          <span>v{updateVersion} available</span>
-          <button className="update-banner-btn" onClick={() => window.api.update.openRelease()}>
-            Download
-          </button>
-          <button className="update-banner-dismiss" onClick={() => setUpdateVersion(null)}>
-            &#10005;
-          </button>
-        </div>
-      )}
       {!sidebarCollapsed && (
         <Sidebar
           onAppSelect={handleAppSelect}
@@ -217,6 +206,17 @@ export default function App() {
       )}
 
       <main className="main-content">
+        {updateVersion && (
+          <div className="update-banner">
+            <span>v{updateVersion} available</span>
+            <button className="update-banner-btn" onClick={() => window.api.update.openRelease(updateVersion!)}>
+              Download
+            </button>
+            <button className="update-banner-dismiss" onClick={() => setUpdateVersion(null)}>
+              &#10005;
+            </button>
+          </div>
+        )}
         <div className="main-top-bar">
           <button
             className="sidebar-toggle"

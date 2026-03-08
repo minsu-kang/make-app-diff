@@ -362,8 +362,15 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('update:open-release', () => {
-    shell.openExternal('https://github.com/minsu-kang/make-app-diff/releases/latest')
+  ipcMain.handle('update:open-release', (_event, version: string) => {
+    const base = `https://github.com/minsu-kang/make-app-diff/releases/download/v${version}`
+    let url: string
+    if (process.platform === 'win32') {
+      url = `${base}/MakeDiff.Setup.${version}.exe`
+    } else {
+      url = `${base}/MakeDiff-${version}-arm64.dmg`
+    }
+    shell.openExternal(url)
   })
 
   ipcMain.handle('ipm:download-version', async (_event, appName: string, version: string) => {

@@ -66,7 +66,7 @@ const api = {
   },
   update: {
     check: (): Promise<IpcResult<void>> => ipcRenderer.invoke('update:check'),
-    openRelease: (): Promise<void> => ipcRenderer.invoke('update:open-release'),
+    openRelease: (version: string): Promise<void> => ipcRenderer.invoke('update:open-release', version),
     onAvailable: (cb: (version: string) => void) => {
       const handler = (_: Electron.IpcRendererEvent, version: string) => cb(version)
       ipcRenderer.on('update:available', handler)
