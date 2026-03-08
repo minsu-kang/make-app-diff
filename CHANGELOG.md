@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.3](https://github.com/minsu-kang/make-app-diff/compare/v1.2.2...v1.2.3) (2026-03-08)
+
+
+### Features
+
+* add Homebrew tap support ([1c7c778](https://github.com/minsu-kang/make-app-diff/commit/1c7c7788d96cb6aa4595136dad0c5c3adeb3c2fc))
+* add Homebrew tap support with auto-update workflow and brew upgrade button ([ed92d4b](https://github.com/minsu-kang/make-app-diff/commit/ed92d4b58ae4b1c48757794360873539fe5f1a70))
+
 ## [1.2.2](https://github.com/minsu-kang/make-app-diff/compare/v1.2.1...v1.2.2) (2026-03-08)
 
 
