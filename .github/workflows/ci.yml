@@ -10,6 +10,9 @@ permissions:
   contents: read
   pull-requests: write
 
+env:
+  IS_RELEASE_PLEASE: ${{ startsWith(github.head_ref, 'release-please--') && github.actor == 'release-please[bot]' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,21 +21,26 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
         with:
           node-version: 20
           cache: npm
 
       - run: npm ci
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
 
       - name: Lint
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
         run: npm run lint
 
       - name: Format check
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
         run: npm run format:check
 
       - name: Test with coverage
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
         run: npm run test:coverage
 
       - name: Coverage report
-        if: github.event_name == 'pull_request'
+        if: ${{ github.event_name == 'pull_request' && env.IS_RELEASE_PLEASE != 'true' }}
         uses: davelosert/vitest-coverage-report-action@v2

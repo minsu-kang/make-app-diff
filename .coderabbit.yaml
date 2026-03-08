@@ -1,5 +1,11 @@
 language: en-US
 reviews:
+  auto_review:
+    base_branches:
+      - main
+    drafts: false
+    ignore_usernames:
+      - 'release-please[bot]'
   profile: chill
   request_changes_workflow: false
   high_level_summary: true
