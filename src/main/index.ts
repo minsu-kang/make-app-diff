@@ -3,6 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import axios from 'axios'
 import { registerIpcHandlers } from './ipc-handlers'
+import { loadSettings } from './services/storage'
 
 const REPO_OWNER = 'minsu-kang'
 const REPO_NAME = 'make-app-diff'
@@ -60,25 +61,36 @@ export async function checkForUpdates(mainWindow: BrowserWindow, manual = false)
   }
 }
 
+const MENU_IDS = ['download-app', 'open-settings', 'about'] as const
+
 function buildMenu(mainWindow: BrowserWindow): void {
+  const settings = loadSettings()
+  const hasTokens = !!(settings.ipmToken || settings.ipmeToken)
+
   const template: Electron.MenuItemConstructorOptions[] = [
     { role: 'appMenu' },
     {
       label: 'File',
       submenu: [
         {
+          id: 'download-app',
           label: 'Download App',
           accelerator: 'CmdOrCtrl+D',
+          enabled: hasTokens,
           click: () => mainWindow.webContents.send('menu:download-app')
         },
         {
+          id: 'open-settings',
           label: 'Open Settings',
           accelerator: 'CmdOrCtrl+,',
+          enabled: hasTokens,
           click: () => mainWindow.webContents.send('menu:open-settings')
         },
         {
+          id: 'about',
           label: 'About',
           accelerator: 'CmdOrCtrl+I',
+          enabled: hasTokens,
           click: () => mainWindow.webContents.send('menu:show-info')
         },
         { type: 'separator' },
@@ -95,6 +107,15 @@ function buildMenu(mainWindow: BrowserWindow): void {
     { role: 'windowMenu' }
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+export function enableMenuItems(): void {
+  const menu = Menu.getApplicationMenu()
+  if (!menu) return
+  for (const id of MENU_IDS) {
+    const item = menu.getMenuItemById(id)
+    if (item) item.enabled = true
+  }
 }
 
 app.whenReady().then(() => {
