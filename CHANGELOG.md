@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.2](https://github.com/minsu-kang/make-app-diff/compare/v1.3.1...v1.3.2) (2026-03-08)
+
+
+### Bug Fixes
+
+* support Windows for clipboard copy ZIP and app menu ([69fdb63](https://github.com/minsu-kang/make-app-diff/commit/69fdb639ae671e6a4cbf56f526d10eac57e255aa))
+* support Windows for clipboard copy ZIP and app menu ([2d70dce](https://github.com/minsu-kang/make-app-diff/commit/2d70dce131f228594ff802048f19411f4c722f83))
+* use execFile for PowerShell clipboard and fix AGENT.md menu docs ([e1e7417](https://github.com/minsu-kang/make-app-diff/commit/e1e7417ab6d0c4d0cf21e23c5fd2cc072e7cab91))
+
 ## [1.3.1](https://github.com/minsu-kang/make-app-diff/compare/v1.3.0...v1.3.1) (2026-03-08)
 
 
