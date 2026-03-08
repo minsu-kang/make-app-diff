@@ -8,7 +8,7 @@ Electron desktop app for viewing diffs between Make.com app versions.
 
 - **Electron** ^31.0 + **React** ^18.3 + **TypeScript** ^5.5
 - **electron-vite** ^2.3 (build), **diff2html** (diff rendering), **electron-store** (persistent storage)
-- macOS target (hiddenInset title bar)
+- macOS (hiddenInset title bar) + Windows (NSIS installer)
 
 ## Commands
 
@@ -21,6 +21,7 @@ npm run lint:fix     # Run ESLint with auto-fix
 npm run format       # Format code with Prettier
 npm run format:check # Check formatting
 npm run test         # Run tests (vitest)
+npm run test:coverage # Run tests with coverage report
 npm run test:watch   # Run tests in watch mode
 npm run postinstall  # Install Electron app deps (runs automatically)
 ```
@@ -59,7 +60,7 @@ All IPC handlers return `IpcResult<T>`:
 
 ## Key Files
 
-- `src/main/index.ts` — Window creation, menu setup
+- `src/main/index.ts` — Window creation, menu setup, update check
 - `src/main/ipc-handlers.ts` — All IPC channel registration
 - `src/preload/index.ts` — Exposes `window.api`, `window.appVersion`, `window.onMenu`
 - `src/renderer/App.tsx` — Root component, state management

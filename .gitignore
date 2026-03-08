@@ -18,6 +18,9 @@ dist/
 .env
 .env.local
 
+# Test coverage
+coverage/
+
 # Electron
 *.dmg
 *.snap

@@ -6,9 +6,13 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 
 ## Development Workflow
 
-1. `npm run dev` to start — uses electron-vite with HMR for renderer
-2. Main/preload changes require app restart; renderer changes hot reload
-3. Build output goes to `out/` directory
+1. Create feature branch (`git checkout -b feat/something`)
+2. `npm run dev` to start — uses electron-vite with HMR for renderer
+3. Main/preload changes require app restart; renderer changes hot reload
+4. Commit with Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
+5. Push and create PR to main → CI runs (lint, format, test, coverage)
+6. Merge → release-please auto-creates Release PR with CHANGELOG + version bump
+7. Build output goes to `out/` directory
 
 ## Architecture Rules
 
@@ -71,12 +75,16 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 | `favorites:save` | `FavoriteApp[]` | `{ success }` |
 | `recent:load` | — | `IpcResult<RecentApp[]>` |
 | `recent:add` | `name, label` | `IpcResult<RecentApp[]>` |
+| `update:check` | — | `IpcResult<void>` |
+| `update:open-release` | — | `void` (opens browser) |
 
 **Menu events:** `menu:download-app`, `menu:open-settings`, `menu:show-info`
 
+**Renderer events (main → renderer):** `update:available` (version string)
+
 ## Preload Exposed Objects
 
-- `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `showInFinder` namespaces)
+- `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `update`, `showInFinder` namespaces)
 - `window.appVersion` — `{ app, electron, chrome, node }`
 - `window.onMenu` — `{ downloadApp, openSettings, showInfo }` callback registration (each returns cleanup function)
 
@@ -171,12 +179,13 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - `.json-path-*` for JSON path annotations
 - `.app-*` for app info/icon elements
 - `.empty-state-*` for landing page
+- `.update-*` for update notification banner
 - `.d2h-*` for diff2html overrides
 
 **Rules:**
 - Global CSS only (no CSS modules)
 - All colors via CSS custom properties
-- macOS desktop only — no responsive/media queries
+- macOS + Windows desktop — no responsive/media queries
 - `-webkit-app-region: drag` on header/drag areas
 - `-webkit-app-region: no-drag` on interactive elements within drag areas
 
@@ -198,7 +207,8 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 ## Electron Window Config
 
 - Size: 1400x900 (min 1000x700)
-- `titleBarStyle: 'hiddenInset'`, `trafficLightPosition: { x: 15, y: 10 }`
+- macOS: `titleBarStyle: 'hiddenInset'`, `trafficLightPosition: { x: 15, y: 10 }` (conditional on `process.platform === 'darwin'`)
+- Windows: default window frame
 - `sandbox: false` in preload
 - External links open via `shell.openExternal`
 
@@ -277,3 +287,25 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Some apps use `communication` array pattern (e.g. Google Drive) — base fields are inside each step
 - `filterDiffs` in App.tsx must handle both compiled (`accounts/`, `hooks/`) and SDK (`connections/`, `webhooks/`) folder prefixes
 - Electron `editMenu` role required for Cmd+A/C/V/X to work in renderer
+- Platform-conditional window config: `titleBarStyle`/`trafficLightPosition` only on macOS
+
+## CI/CD
+
+**Workflows (`.github/workflows/`):**
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | push to main, PR to main | Lint, format check, test with coverage |
+| `pr-validate.yml` | PR opened/edited | PR title must follow Conventional Commits |
+| `release-please.yml` | push to main, workflow_dispatch | CHANGELOG + version bump + DMG/EXE build |
+
+**Release flow:**
+1. Merge PR to main → release-please creates Release PR (CHANGELOG.md + version bump)
+2. Merge Release PR → GitHub Release created → `build-mac` + `build-win` jobs run in parallel
+3. DMG + EXE uploaded to Release assets
+
+**Update check:** App checks GitHub API (`/repos/{owner}/{repo}/releases/latest`) on startup and via File > Check for Updates. Shows dismissible banner with link to download.
+
+**External integrations:**
+- CodeRabbit (`.coderabbit.yaml`) — AI code review on PRs
+- CODEOWNERS — `@minsu-kang` owns all files
