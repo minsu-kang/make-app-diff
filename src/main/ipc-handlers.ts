@@ -3,7 +3,7 @@ import * as fs from 'fs/promises'
 import { createWriteStream } from 'fs'
 import * as path from 'path'
 import { tmpdir } from 'os'
-import { exec } from 'child_process'
+import { exec, execFile } from 'child_process'
 import archiver from 'archiver'
 import { enableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
@@ -347,9 +347,17 @@ export function registerIpcHandlers(): void {
         } else {
           // Windows clipboard: use PowerShell + .NET to set CF_HDROP file drop list
           const escaped = zipPath.replace(/'/g, "''")
+          const command = [
+            'Add-Type -AssemblyName System.Windows.Forms',
+            '$col = New-Object System.Collections.Specialized.StringCollection',
+            `$null = $col.Add('${escaped}')`,
+            '[System.Windows.Forms.Clipboard]::SetFileDropList($col)'
+          ].join('; ')
           await new Promise<void>((resolve, reject) => {
-            exec(
-              `powershell -command "Add-Type -AssemblyName System.Windows.Forms; $col = New-Object System.Collections.Specialized.StringCollection; $col.Add('${escaped}'); [System.Windows.Forms.Clipboard]::SetFileDropList($col)"`,
+            execFile(
+              'powershell.exe',
+              ['-NoProfile', '-NonInteractive', '-Command', command],
+              { windowsHide: true },
               (err) => (err ? reject(err) : resolve())
             )
           })

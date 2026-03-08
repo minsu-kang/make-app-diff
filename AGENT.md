@@ -293,7 +293,7 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - `filterDiffs` in App.tsx must handle both compiled (`accounts/`, `hooks/`) and SDK (`connections/`, `webhooks/`) folder prefixes
 - Electron `editMenu` role required for Cmd+A/C/V/X to work in renderer
 - Platform-conditional window config: `titleBarStyle`/`trafficLightPosition` only on macOS
-- File menu items (Compare, Download, Check for Updates) disabled until settings are validated via `enableMenuItems()`
+- Menu items `download-app`, `open-settings`, `about` disabled until settings are validated via `enableMenuItems()`
 
 ## Platform-Specific Behaviors
 
