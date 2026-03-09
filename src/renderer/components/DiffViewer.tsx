@@ -69,11 +69,11 @@ export default function DiffViewer({
   const diffEditorRef = useRef<editor.IDiffEditor | null>(null)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
-  // Suppress Monaco custom tooltips on find widget buttons (prevents flicker)
+  // Suppress Monaco custom tooltips on find widget toggle buttons (prevents flicker)
   useEffect(() => {
     const handler = (e: MouseEvent): void => {
-      const target = e.target as HTMLElement
-      if (target.closest('.find-widget')) {
+      if (!(e.target instanceof Element)) return
+      if (e.target.closest('.find-widget .monaco-custom-toggle, .find-widget .codicon-widget-close')) {
         e.stopImmediatePropagation()
       }
     }

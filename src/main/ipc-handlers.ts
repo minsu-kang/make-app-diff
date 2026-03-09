@@ -3,7 +3,7 @@ import * as fs from 'fs/promises'
 import { createWriteStream } from 'fs'
 import * as path from 'path'
 import { tmpdir } from 'os'
-import { exec, execFile } from 'child_process'
+import { execFile } from 'child_process'
 import archiver from 'archiver'
 import { enableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
@@ -479,8 +479,9 @@ export function registerIpcHandlers(): void {
               resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
               return
             }
-            exec(`"${codePaths[i]}" --diff "${oldFile}" "${newFile}"`, (err) => {
-              if (err) tryNext(i + 1)
+            execFile(codePaths[i], ['--diff', oldFile, newFile], (err) => {
+              if (err && (err as NodeJS.ErrnoException).code === 'ENOENT') tryNext(i + 1)
+              else if (err) resolve({ success: false, error: err.message })
               else resolve({ success: true })
             })
           }
