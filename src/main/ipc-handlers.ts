@@ -459,11 +459,32 @@ export function registerIpcHandlers(): void {
         await fs.writeFile(oldFile, opts.oldContent, 'utf-8')
         await fs.writeFile(newFile, opts.newContent, 'utf-8')
 
+        // Electron doesn't inherit shell PATH; try known VS Code CLI paths
+        const codePaths =
+          process.platform === 'darwin'
+            ? [
+                '/usr/local/bin/code',
+                '/opt/homebrew/bin/code',
+                '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+              ]
+            : [
+                'code',
+                `${process.env.LOCALAPPDATA}\\Programs\\Microsoft VS Code\\bin\\code.cmd`,
+                'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd'
+              ]
+
         return new Promise((resolve) => {
-          exec(`code --diff "${oldFile}" "${newFile}"`, (err) => {
-            if (err) resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
-            else resolve({ success: true })
-          })
+          const tryNext = (i: number): void => {
+            if (i >= codePaths.length) {
+              resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
+              return
+            }
+            exec(`"${codePaths[i]}" --diff "${oldFile}" "${newFile}"`, (err) => {
+              if (err) tryNext(i + 1)
+              else resolve({ success: true })
+            })
+          }
+          tryNext(0)
         })
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
