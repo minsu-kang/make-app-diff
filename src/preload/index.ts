@@ -77,8 +77,8 @@ const api = {
       ipcRenderer.on('update:up-to-date', handler)
       return () => ipcRenderer.removeListener('update:up-to-date', handler)
     },
-    onError: (cb: () => void) => {
-      const handler = () => cb()
+    onError: (cb: (message?: string) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, message?: string) => cb(message)
       ipcRenderer.on('update:error', handler)
       return () => ipcRenderer.removeListener('update:error', handler)
     }

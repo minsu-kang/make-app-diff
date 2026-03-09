@@ -7,6 +7,9 @@ import { loadSettings } from './services/storage'
 
 const REPO_OWNER = 'minsu-kang'
 const REPO_NAME = 'make-app-diff'
+const UPDATE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+let updateCache: { version: string; timestamp: number } | null = null
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -42,21 +45,38 @@ function createWindow(): void {
 }
 
 export async function checkForUpdates(mainWindow: BrowserWindow, manual = false): Promise<void> {
+  // Use cached response if still fresh
+  if (updateCache && Date.now() - updateCache.timestamp < UPDATE_CACHE_TTL) {
+    const current = app.getVersion()
+    if (updateCache.version !== current) {
+      mainWindow.webContents.send('update:available', updateCache.version)
+    } else if (manual) {
+      mainWindow.webContents.send('update:up-to-date')
+    }
+    return
+  }
+
   try {
     const { data } = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`, {
       headers: { Accept: 'application/vnd.github.v3+json' },
       timeout: 10000
     })
     const latest = (data.tag_name as string).replace(/^v/, '')
+    updateCache = { version: latest, timestamp: Date.now() }
     const current = app.getVersion()
     if (latest !== current) {
       mainWindow.webContents.send('update:available', latest)
     } else if (manual) {
       mainWindow.webContents.send('update:up-to-date')
     }
-  } catch {
+  } catch (error: unknown) {
     if (manual) {
-      mainWindow.webContents.send('update:error')
+      const isRateLimit =
+        axios.isAxiosError(error) && error.response?.status === 403
+      const message = isRateLimit
+        ? 'GitHub API rate limit exceeded. Please try again later.'
+        : 'Could not check for updates'
+      mainWindow.webContents.send('update:error', message)
     }
   }
 }
