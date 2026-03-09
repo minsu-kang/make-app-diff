@@ -1,30 +1,4 @@
-// Split highlighted HTML by newlines while preserving open <span> context
-export function splitHighlightedLines(html: string): string[] {
-  const lines = html.split('\n')
-  const result: string[] = []
-  const openSpans: string[] = []
-
-  for (const line of lines) {
-    // Prepend any spans still open from previous lines
-    const prefix = openSpans.join('')
-    const output = prefix + line
-
-    // Track open/close spans on this line
-    const opens = line.match(/<span [^>]*>/g) || []
-    const closes = line.match(/<\/span>/g) || []
-
-    // Update the stack
-    for (const tag of opens) openSpans.push(tag)
-    for (let i = 0; i < closes.length; i++) openSpans.pop()
-
-    // Close any still-open spans at end of this line
-    const suffix = '</span>'.repeat(openSpans.length)
-    result.push(output + suffix)
-  }
-  return result
-}
-
-// Build a map of line number → JSON path for annotation
+// Build a map of line number -> JSON path for annotation
 export function buildJsonPathMap(content: string): Map<number, string> {
   const pathMap = new Map<number, string>()
   try {

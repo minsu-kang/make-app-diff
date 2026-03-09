@@ -175,14 +175,11 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - `.sidebar-*`, `.search-*`, `.btn-*`, `.version-*`
 - `.tab-*`, `.tree-*`, `.file-tree-*`, `.diff-*`
 - `.settings-*`, `.info-*`, `.download-*`
-- `.code-*` for code viewer (show mode)
 - `.toast-*` for toast notifications
 - `.media-*` for image previews
-- `.json-path-*` for JSON path annotations
 - `.app-*` for app info/icon elements
 - `.empty-state-*` for landing page
 - `.update-*` for update notification banner
-- `.d2h-*` for diff2html overrides
 
 **Rules:**
 - Global CSS only (no CSS modules)
@@ -195,7 +192,9 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 
 Three themes: `dark` (default, Catppuccin-inspired), `make` (Make.com purple), `light` (Apple-inspired)
 - Theme stored via electron-store, applied as `data-theme` attribute on `<html>`
-- DiffViewer uses `d2h-dark-color-scheme` class for dark/make themes
+- CSS variables in `global.css` for layout/UI colors
+- Monaco editor themes defined in `themes/monaco-themes.ts` (`makediff-dark`, `makediff-make`, `makediff-light`)
+- DiffViewer observes `data-theme` changes and calls `getMonacoTheme()` to sync
 
 ## useIpc Hook
 
@@ -231,14 +230,17 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Starts collapsed; user expands folders manually
 
 ### DiffViewer (`DiffViewer.tsx`)
-- Side-by-side for modified files, unified (line-by-line) for added/deleted files
-- Full file context (no line skipping)
-- Cmd+A selects only the active side (left or right)
-- Copy handler strips empty placeholder rows (no blank lines from the other side)
-- Copy button: copies file content (show mode) or unified diff (diff mode) via `navigator.clipboard.writeText`
+- Uses Monaco DiffEditor (`@monaco-editor/react`) for all diff/code views
+- Diff mode + modified: `DiffEditor` side-by-side (`renderSideBySide: true`)
+- Diff mode + added/deleted: `DiffEditor` inline (`renderSideBySide: false`)
+- Show mode: `Editor` (read-only single file view)
+- Image files: custom JSX preview (data:image/* detection via `isValidDataUri`)
+- Search (Cmd+F), scroll sync, code folding, word diff: all Monaco native
+- Unchanged region collapsing: `hideUnchangedRegions` (3 context lines, min 8 lines)
+- Copy button: copies file content (show mode) or unified diff (diff mode)
 - Open in VS Code button: writes temp files and runs `code --diff` via `editor:open-diff`
-- `tab-size: 2` for compact indentation
-- `user-select: text` overrides global `user-select: none`
+- Expand All button: reveals all collapsed unchanged regions
+- Theme synced via MutationObserver on `data-theme` attribute → `getMonacoTheme()`
 
 ### Sidebar (`Sidebar.tsx`)
 - Search input with Cmd+K focus shortcut
@@ -272,11 +274,12 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Global toast notifications via `showToast(text, type)` function
 - Auto-dismiss after 4s, supports error/success/info types
 
-### diff2html Overrides
-- Compact line numbers (32px), minimal prefix/padding
-- Empty placeholder cells: `user-select: none` via `.d2h-code-side-emptyplaceholder`
-- File headers hidden, borders removed
-- Dark theme via `d2h-dark-color-scheme` class
+### Monaco Setup (`monaco-setup.ts`)
+- Local Monaco loading via `loader.config({ monaco })` — no CDN, Electron offline support
+- Workers: `editor.worker` (default) + `json.worker` (JSON/IMLJSON)
+- IMLJSON language: Monarch tokenizer in `languages/imljson.ts` (JSON + `{{IML}}` + `rpc://`)
+- 3 themes in `themes/monaco-themes.ts`: `makediff-dark`, `makediff-make`, `makediff-light`
+- Helpers: `getMonacoTheme()` (reads `data-theme`), `getLanguageForFile(path)` (ext→language map)
 
 ## Common Pitfalls
 

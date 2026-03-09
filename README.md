@@ -9,9 +9,9 @@ Built with Electron + React + TypeScript for macOS and Windows.
 - **Version comparison** — Select any two versions of a Make.com app and view a full diff
 - **Custom app decompiler** — Automatically transforms compiled custom apps (`lib/app.js`, `lib/rpc.js`) into readable SDK structure (`modules/`, `rpcs/`, `functions/`, `connections/`)
 - **IDE-style file tree** — Collapsible folder tree with extension-based file icons, status coloring, and resizable panel
-- **Side-by-side diff** — Modified files shown side-by-side; added/deleted files shown in unified format
-- **Full context** — Entire file content displayed, no collapsed/skipped lines
-- **Smart copy** — Cmd+A selects only the active side; copy strips empty placeholder rows
+- **Monaco DiffEditor** — VS Code-quality side-by-side diff with native word-level highlighting, search (Cmd+F), code folding, and scroll sync
+- **Unchanged region collapsing** — Long unchanged sections auto-collapsed with expand controls
+- **IMLJSON syntax** — Custom Monarch tokenizer for JSON + IML `{{expressions}}` + `rpc://` references
 - **Dependency diffing** — Automatically downloads and diffs account/hook dependencies from manifests
 - **Three themes** — Dark (default), Make (purple), Light (Apple-inspired)
 - **App download** — Download any app version to a local folder in SDK structure
@@ -73,6 +73,8 @@ src/
   preload/        # Bridge — exposes window.api via contextBridge
   renderer/       # React SPA — components, styles
     components/   # App, FileTree, DiffViewer, SettingsModal, etc.
+    languages/    # IMLJSON Monarch tokenizer
+    themes/       # Monaco theme definitions (dark/make/light)
     styles/       # global.css (all styles + themes)
 ```
 
@@ -100,7 +102,7 @@ When a downloaded app is detected as a custom app (contains `lib/app.js`), the d
 - **React** ^18.3 — UI framework
 - **TypeScript** ^5.5 — Type safety
 - **electron-vite** ^2.3 — Build tooling with HMR
-- **diff2html** — Diff rendering
+- **monaco-editor** + **@monaco-editor/react** — Diff rendering
 - **electron-store** — Persistent settings
 - **pkr** — PKR archive extraction
 

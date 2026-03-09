@@ -76,6 +76,7 @@ export interface DiffResult {
     modified: number
     unchanged: number
   }
+  isCustomApp?: boolean
 }
 
 export interface FavoriteApp {

@@ -6,9 +6,19 @@ interface ComponentTabsProps {
   activeTab: ComponentType
   onTabChange: (tab: ComponentType) => void
   summaries: Record<ComponentType, { added: number; deleted: number; modified: number } | null>
+  isCustomApp?: boolean
+  decompile?: boolean
+  onDecompileToggle?: () => void
 }
 
-export default function ComponentTabs({ activeTab, onTabChange, summaries }: ComponentTabsProps) {
+export default function ComponentTabs({
+  activeTab,
+  onTabChange,
+  summaries,
+  isCustomApp,
+  decompile,
+  onDecompileToggle
+}: ComponentTabsProps) {
   const tabs: { key: ComponentType; label: string }[] = [
     { key: 'app', label: 'App' },
     { key: 'account', label: 'Connection' },
@@ -38,6 +48,24 @@ export default function ComponentTabs({ activeTab, onTabChange, summaries }: Com
           </button>
         )
       })}
+      {isCustomApp && onDecompileToggle && (
+        <button
+          className={`btn-decompile-toggle ${decompile ? 'active' : ''}`}
+          onClick={onDecompileToggle}
+          title={decompile ? 'Switch to raw compiled view' : 'Switch to SDK decompiled view'}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M5.5 3L1 8l4.5 5M10.5 3L15 8l-4.5 5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="btn-decompile-label">{decompile ? 'SDK' : 'Raw'}</span>
+        </button>
+      )}
     </div>
   )
 }
