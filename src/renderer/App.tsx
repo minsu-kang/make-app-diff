@@ -55,8 +55,8 @@ export default function App() {
     const cleanupUpToDate = window.api.update.onUpToDate(() => {
       showToast('You are on the latest version', 'success')
     })
-    const cleanupError = window.api.update.onError(() => {
-      showToast('Could not check for updates', 'error')
+    const cleanupError = window.api.update.onError((message) => {
+      showToast(message || 'Could not check for updates', 'error')
     })
     return () => {
       cleanupAvailable()
