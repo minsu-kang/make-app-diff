@@ -30,6 +30,7 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   automaticLayout: true,
   wordWrap: 'off',
   contextmenu: false,
+  fixedOverflowWidgets: true,
   scrollbar: {
     verticalScrollbarSize: 8,
     horizontalScrollbarSize: 8
@@ -56,6 +57,18 @@ const DIFF_EDITOR_OPTIONS: editor.IDiffEditorConstructionOptions = {
   }
 }
 
+/**
+ * Render a file diff viewer that displays code diffs or file contents with editor controls and image previews.
+ *
+ * Renders a read-only Monaco editor or diff editor for the selected file, shows an inline image preview when the file content is a data URI image, and provides actions to copy the displayed content, open the diff in VS Code, and expand hidden diff regions.
+ *
+ * @param diffs - Array of file diffs to display
+ * @param selectedFile - Path of the currently selected file; when not provided the component prompts to select a file
+ * @param viewMode - Viewer mode: `'diff'` to show differences or `'show'` to show the file content (default `'diff'`)
+ * @param fromVersion - Optional source version identifier used when opening a diff in VS Code
+ * @param toVersion - Optional target version identifier used when opening a diff in VS Code
+ * @returns A React element containing the diff viewer UI
+ */
 export default function DiffViewer({
   diffs,
   selectedFile,
@@ -67,6 +80,18 @@ export default function DiffViewer({
   const [copied, setCopied] = useState(false)
   const diffEditorRef = useRef<editor.IDiffEditor | null>(null)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+
+  // Suppress Monaco custom tooltips on find widget buttons (prevents flicker)
+  useEffect(() => {
+    const handler = (e: MouseEvent): void => {
+      const target = e.target as HTMLElement
+      if (target.closest('.find-widget')) {
+        e.stopImmediatePropagation()
+      }
+    }
+    document.addEventListener('mouseover', handler, true)
+    return () => document.removeEventListener('mouseover', handler, true)
+  }, [])
 
   const visibleDiff = useMemo(
     () => (selectedFile ? diffs.find((d) => d.filePath === selectedFile) : null),
