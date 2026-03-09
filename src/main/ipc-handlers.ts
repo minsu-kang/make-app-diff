@@ -3,7 +3,7 @@ import * as fs from 'fs/promises'
 import { createWriteStream } from 'fs'
 import * as path from 'path'
 import { tmpdir } from 'os'
-import { exec, execFile } from 'child_process'
+import { execFile } from 'child_process'
 import archiver from 'archiver'
 import { enableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
@@ -459,11 +459,33 @@ export function registerIpcHandlers(): void {
         await fs.writeFile(oldFile, opts.oldContent, 'utf-8')
         await fs.writeFile(newFile, opts.newContent, 'utf-8')
 
+        // Electron doesn't inherit shell PATH; try known VS Code CLI paths
+        const codePaths =
+          process.platform === 'darwin'
+            ? [
+                '/usr/local/bin/code',
+                '/opt/homebrew/bin/code',
+                '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+              ]
+            : [
+                'code',
+                `${process.env.LOCALAPPDATA}\\Programs\\Microsoft VS Code\\bin\\code.cmd`,
+                'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd'
+              ]
+
         return new Promise((resolve) => {
-          exec(`code --diff "${oldFile}" "${newFile}"`, (err) => {
-            if (err) resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
-            else resolve({ success: true })
-          })
+          const tryNext = (i: number): void => {
+            if (i >= codePaths.length) {
+              resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
+              return
+            }
+            execFile(codePaths[i], ['--diff', oldFile, newFile], (err) => {
+              if (err && (err as NodeJS.ErrnoException).code === 'ENOENT') tryNext(i + 1)
+              else if (err) resolve({ success: false, error: err.message })
+              else resolve({ success: true })
+            })
+          }
+          tryNext(0)
         })
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)

@@ -30,6 +30,7 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   automaticLayout: true,
   wordWrap: 'off',
   contextmenu: false,
+  fixedOverflowWidgets: true,
   scrollbar: {
     verticalScrollbarSize: 8,
     horizontalScrollbarSize: 8
@@ -67,6 +68,18 @@ export default function DiffViewer({
   const [copied, setCopied] = useState(false)
   const diffEditorRef = useRef<editor.IDiffEditor | null>(null)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+
+  // Suppress Monaco custom tooltips on find widget toggle buttons (prevents flicker)
+  useEffect(() => {
+    const handler = (e: MouseEvent): void => {
+      if (!(e.target instanceof Element)) return
+      if (e.target.closest('.find-widget .monaco-custom-toggle, .find-widget .codicon-widget-close')) {
+        e.stopImmediatePropagation()
+      }
+    }
+    document.addEventListener('mouseover', handler, true)
+    return () => document.removeEventListener('mouseover', handler, true)
+  }, [])
 
   const visibleDiff = useMemo(
     () => (selectedFile ? diffs.find((d) => d.filePath === selectedFile) : null),

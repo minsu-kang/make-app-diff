@@ -835,7 +835,7 @@ body {
   width: 100%;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  position: relative;
 }
 
 /* Media preview (binary images) */
