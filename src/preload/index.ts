@@ -89,10 +89,15 @@ const api = {
     getAppIcon: (appName: string): Promise<IpcResult<string>> => ipcRenderer.invoke('ipm:get-app-icon', appName),
     downloadAndExtract: (appName: string, version: string, type: ComponentType): Promise<IpcResult<ExtractedFile[]>> =>
       ipcRenderer.invoke('ipm:download-and-extract', appName, version, type),
-    getDiff: (appName: string, fromVersion: string, toVersion: string): Promise<IpcResult<DiffResult>> =>
-      ipcRenderer.invoke('ipm:get-diff', appName, fromVersion, toVersion),
-    showVersion: (appName: string, version: string): Promise<IpcResult<DiffResult>> =>
-      ipcRenderer.invoke('ipm:show-version', appName, version),
+    getDiff: (
+      appName: string,
+      fromVersion: string,
+      toVersion: string,
+      decompile?: boolean
+    ): Promise<IpcResult<DiffResult>> =>
+      ipcRenderer.invoke('ipm:get-diff', appName, fromVersion, toVersion, decompile ?? true),
+    showVersion: (appName: string, version: string, decompile?: boolean): Promise<IpcResult<DiffResult>> =>
+      ipcRenderer.invoke('ipm:show-version', appName, version, decompile ?? true),
     downloadVersion: (appName: string, version: string): Promise<IpcResult<string>> =>
       ipcRenderer.invoke('ipm:download-version', appName, version)
   }

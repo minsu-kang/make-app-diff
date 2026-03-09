@@ -7,7 +7,7 @@ Electron desktop app for viewing diffs between Make.com app versions.
 ## Tech Stack
 
 - **Electron** ^31.0 + **React** ^18.3 + **TypeScript** ^5.5
-- **electron-vite** ^2.3 (build), **diff2html** (diff rendering), **electron-store** (persistent storage)
+- **electron-vite** ^2.3 (build), **monaco-editor** + **@monaco-editor/react** (diff rendering), **electron-store** (persistent storage)
 - macOS (hiddenInset title bar) + Windows (NSIS installer)
 
 ## Commands
@@ -64,4 +64,7 @@ All IPC handlers return `IpcResult<T>`:
 - `src/main/ipc-handlers.ts` — All IPC channel registration
 - `src/preload/index.ts` — Exposes `window.api`, `window.appVersion`, `window.onMenu`
 - `src/renderer/App.tsx` — Root component, state management
+- `src/renderer/monaco-setup.ts` — Monaco worker config, loader, language/theme registration
+- `src/renderer/languages/imljson.ts` — IMLJSON Monarch tokenizer (JSON + IML `{{expressions}}`)
+- `src/renderer/themes/monaco-themes.ts` — 3 Monaco themes (dark/make/light)
 - `src/renderer/styles/global.css` — All styles + themes (dark/make/light)

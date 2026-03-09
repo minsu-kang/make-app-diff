@@ -18,12 +18,12 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
+    "@monaco-editor/react": "^4.7.0",
     "archiver": "^7.0.1",
     "axios": "^1.7.0",
     "diff": "^5.2.0",
-    "diff2html": "^3.4.48",
     "electron-store": "^8.2.0",
-    "highlight.js": "^11.11.1",
+    "monaco-editor": "^0.55.1",
     "pkr": "^2.0.2"
   },
   "devDependencies": {

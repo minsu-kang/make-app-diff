@@ -1,44 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitHighlightedLines, buildJsonPathMap, isValidDataUri } from '../diff-viewer'
-
-describe('splitHighlightedLines', () => {
-  it('splits plain text by newlines', () => {
-    const result = splitHighlightedLines('line1\nline2\nline3')
-    expect(result).toEqual(['line1', 'line2', 'line3'])
-  })
-
-  it('handles single line without newline', () => {
-    expect(splitHighlightedLines('hello')).toEqual(['hello'])
-  })
-
-  it('preserves span context across lines', () => {
-    const html = '<span class="keyword">if\ntrue</span>'
-    const result = splitHighlightedLines(html)
-    expect(result).toHaveLength(2)
-    // First line: opens span and closes it at end
-    expect(result[0]).toBe('<span class="keyword">if</span>')
-    // Second line: re-opens the span and includes the close tag
-    expect(result[1]).toBe('<span class="keyword">true</span>')
-  })
-
-  it('handles nested spans across lines', () => {
-    const html = '<span class="outer"><span class="inner">a\nb</span></span>'
-    const result = splitHighlightedLines(html)
-    expect(result).toHaveLength(2)
-    expect(result[0]).toContain('</span></span>')
-    expect(result[1]).toContain('<span class="outer"><span class="inner">')
-  })
-
-  it('handles empty input', () => {
-    expect(splitHighlightedLines('')).toEqual([''])
-  })
-
-  it('handles line with only closing tags', () => {
-    const html = '<span class="a">x\n</span>'
-    const result = splitHighlightedLines(html)
-    expect(result).toHaveLength(2)
-  })
-})
+import { buildJsonPathMap, isValidDataUri } from '../diff-viewer'
 
 describe('buildJsonPathMap', () => {
   it('returns empty map for invalid JSON', () => {

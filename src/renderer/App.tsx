@@ -45,6 +45,7 @@ export default function App() {
   const [appIcon, setAppIcon] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [viewMode, setViewMode] = useState<'diff' | 'show'>('diff')
+  const [decompile, setDecompile] = useState(true)
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
 
   useEffect(() => {
@@ -103,6 +104,7 @@ export default function App() {
     setSelectedFile(null)
     setError(null)
     setAppIcon(null)
+    setDecompile(true)
 
     // Fetch app icon from /admin/icon/apps/{appName}
     window.api.ipm
@@ -133,38 +135,43 @@ export default function App() {
     setToVersion(fromVersion)
   }, [fromVersion, toVersion])
 
-  const handleCompare = useCallback(async () => {
-    if (!appInfo || !fromVersion || !toVersion) return
+  const handleCompare = useCallback(
+    async (decompileFlag?: boolean) => {
+      if (!appInfo || !fromVersion || !toVersion) return
 
-    setViewMode('diff')
-    setLoading(true)
-    setError(null)
-    setSelectedFile(null)
+      const flag = typeof decompileFlag === 'boolean' ? decompileFlag : decompile
+      setViewMode('diff')
+      setLoading(true)
+      setError(null)
+      setSelectedFile(null)
 
-    try {
-      const result = await window.api.ipm.getDiff(appInfo.name, fromVersion, toVersion)
-      if (result.success && result.data) {
-        setDiffResult(result.data)
-      } else {
-        setError(result.error || 'Compare failed')
+      try {
+        const result = await window.api.ipm.getDiff(appInfo.name, fromVersion, toVersion, flag)
+        if (result.success && result.data) {
+          setDiffResult(result.data)
+        } else {
+          setError(result.error || 'Compare failed')
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        setError(message)
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-    } finally {
-      setLoading(false)
-    }
-  }, [appInfo, fromVersion, toVersion])
+    },
+    [appInfo, fromVersion, toVersion, decompile]
+  )
 
   const handleShow = useCallback(
-    async (version: string) => {
+    async (version: string, decompileFlag?: boolean) => {
       if (!appInfo) return
+      const flag = typeof decompileFlag === 'boolean' ? decompileFlag : decompile
       setViewMode('show')
       setLoading(true)
       setError(null)
       setSelectedFile(null)
       try {
-        const result = await window.api.ipm.showVersion(appInfo.name, version)
+        const result = await window.api.ipm.showVersion(appInfo.name, version, flag)
         if (result.success && result.data) {
           setDiffResult(result.data)
         } else {
@@ -177,8 +184,14 @@ export default function App() {
         setLoading(false)
       }
     },
-    [appInfo]
+    [appInfo, decompile]
   )
+
+  const handleDecompileToggle = useCallback(() => {
+    const newDecompile = !decompile
+    setDecompile(newDecompile)
+    if (toVersion) handleShow(toVersion, newDecompile)
+  }, [decompile, toVersion, handleShow])
 
   const currentDiffs = useMemo(() => {
     if (!diffResult) return []
@@ -409,6 +422,9 @@ export default function App() {
                     setSelectedFile(null)
                   }}
                   summaries={summaries}
+                  isCustomApp={viewMode === 'show' ? diffResult?.isCustomApp : undefined}
+                  decompile={decompile}
+                  onDecompileToggle={handleDecompileToggle}
                 />
 
                 <div className="diff-layout">

@@ -34,6 +34,37 @@ function sanitizePath(baseDir: string, filePath: string): string {
   return resolved
 }
 
+interface RawDepEntry {
+  depName: string
+  files: ExtractedFile[]
+}
+
+interface CachedDiffData {
+  appName: string
+  fromVersion: string
+  toVersion: string
+  fromFiles: ExtractedFile[]
+  toFiles: ExtractedFile[]
+  fromIsCustom: boolean
+  toIsCustom: boolean
+  fromAccDeps: RawDepEntry[]
+  toAccDeps: RawDepEntry[]
+  fromHookDeps: RawDepEntry[]
+  toHookDeps: RawDepEntry[]
+}
+
+interface CachedShowData {
+  appName: string
+  version: string
+  files: ExtractedFile[]
+  isCustom: boolean
+  accDeps: RawDepEntry[]
+  hookDeps: RawDepEntry[]
+}
+
+let diffCache: CachedDiffData | null = null
+let showCache: CachedShowData | null = null
+
 async function downloadDepsForVersion(
   client: IpmClient,
   depNames: string[],
@@ -59,6 +90,57 @@ async function downloadDepsForVersion(
       }
     })
   )
+
+  return results
+}
+
+function cloneFiles(files: ExtractedFile[]): ExtractedFile[] {
+  return files.map((f) => ({ path: f.path, content: f.content }))
+}
+
+async function downloadRawDeps(
+  client: IpmClient,
+  depNames: string[],
+  version: string,
+  depType: 'account' | 'hook'
+): Promise<RawDepEntry[]> {
+  const results: RawDepEntry[] = []
+
+  await Promise.all(
+    depNames.map(async (depName) => {
+      try {
+        const buffer = await client.downloadDependencyComponent(depName, version, depType)
+        const files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
+        results.push({ depName, files: cloneFiles(files) })
+      } catch {
+        /* skip */
+      }
+    })
+  )
+
+  return results
+}
+
+function applyDepsDecompile(
+  rawDeps: RawDepEntry[],
+  depType: 'account' | 'hook',
+  isCustom: boolean,
+  decompile: boolean
+): ExtractedFile[] {
+  const decompileFn = depType === 'account' ? decompileAccount : decompileHook
+  const compiledFolder = depType === 'account' ? 'accounts' : 'hooks'
+  const sdkFolder = depType === 'account' ? 'connections' : 'webhooks'
+  const results: ExtractedFile[] = []
+
+  for (const { depName, files } of rawDeps) {
+    let processed = cloneFiles(files)
+    if (isCustom && decompile) {
+      processed = decompileFn(processed)
+      results.push(...processed.map((f) => ({ path: `${sdkFolder}/${depName}/${f.path}`, content: f.content })))
+    } else {
+      results.push(...processed.map((f) => ({ path: `${compiledFolder}/${depName}/${f.path}`, content: f.content })))
+    }
+  }
 
   return results
 }
@@ -152,95 +234,176 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('ipm:get-diff', async (_event, appName: string, fromVersion: string, toVersion: string) => {
-    try {
-      // Download app + get manifests in parallel
-      const [fromAppBuffer, toAppBuffer, fromManifest, toManifest] = await Promise.all([
-        ipmClient.downloadComponent(appName, fromVersion, 'app'),
-        ipmClient.downloadComponent(appName, toVersion, 'app'),
-        ipmClient.getManifest(appName, fromVersion),
-        ipmClient.getManifest(appName, toVersion)
-      ])
+  ipcMain.handle(
+    'ipm:get-diff',
+    async (_event, appName: string, fromVersion: string, toVersion: string, decompile: boolean = true) => {
+      try {
+        const cacheHit =
+          diffCache &&
+          diffCache.appName === appName &&
+          diffCache.fromVersion === fromVersion &&
+          diffCache.toVersion === toVersion
 
-      // App files — decompile if custom app
-      let fromFiles: ExtractedFile[] = extractPkr(fromAppBuffer)
-      let toFiles: ExtractedFile[] = extractPkr(toAppBuffer)
-      const fromIsCustom = isCustomApp(fromFiles)
-      const toIsCustom = isCustomApp(toFiles)
-      if (fromIsCustom) fromFiles = decompileApp(fromFiles, appName)
-      if (toIsCustom) toFiles = decompileApp(toFiles, appName)
+        let fromRawFiles: ExtractedFile[]
+        let toRawFiles: ExtractedFile[]
+        let fromIsCustom: boolean
+        let toIsCustom: boolean
+        let fromAccDeps: RawDepEntry[]
+        let toAccDeps: RawDepEntry[]
+        let fromHookDeps: RawDepEntry[]
+        let toHookDeps: RawDepEntry[]
 
-      // Download dependencies for both versions in parallel
-      const fromAccounts = fromManifest.dependencies?.accounts || []
-      const toAccounts = toManifest.dependencies?.accounts || []
-      const fromHooks = fromManifest.dependencies?.hooks || []
-      const toHooks = toManifest.dependencies?.hooks || []
-      const allAccounts = [...new Set([...fromAccounts, ...toAccounts])]
-      const allHooks = [...new Set([...fromHooks, ...toHooks])]
+        if (cacheHit) {
+          fromRawFiles = diffCache!.fromFiles
+          toRawFiles = diffCache!.toFiles
+          fromIsCustom = diffCache!.fromIsCustom
+          toIsCustom = diffCache!.toIsCustom
+          fromAccDeps = diffCache!.fromAccDeps
+          toAccDeps = diffCache!.toAccDeps
+          fromHookDeps = diffCache!.fromHookDeps
+          toHookDeps = diffCache!.toHookDeps
+        } else {
+          // Download app + get manifests in parallel
+          const [fromAppBuffer, toAppBuffer, fromManifest, toManifest] = await Promise.all([
+            ipmClient.downloadComponent(appName, fromVersion, 'app'),
+            ipmClient.downloadComponent(appName, toVersion, 'app'),
+            ipmClient.getManifest(appName, fromVersion),
+            ipmClient.getManifest(appName, toVersion)
+          ])
 
-      const [fromAccFiles, toAccFiles, fromHookFiles, toHookFiles] = await Promise.all([
-        downloadDepsForVersion(
-          ipmClient,
-          allAccounts.filter((d) => fromAccounts.includes(d)),
-          fromVersion,
-          'account',
-          fromIsCustom
-        ),
-        downloadDepsForVersion(
-          ipmClient,
-          allAccounts.filter((d) => toAccounts.includes(d)),
-          toVersion,
-          'account',
-          toIsCustom
-        ),
-        downloadDepsForVersion(
-          ipmClient,
-          allHooks.filter((d) => fromHooks.includes(d)),
-          fromVersion,
-          'hook',
-          fromIsCustom
-        ),
-        downloadDepsForVersion(
-          ipmClient,
-          allHooks.filter((d) => toHooks.includes(d)),
-          toVersion,
-          'hook',
-          toIsCustom
+          fromRawFiles = cloneFiles(extractPkr(fromAppBuffer))
+          toRawFiles = cloneFiles(extractPkr(toAppBuffer))
+          fromIsCustom = isCustomApp(fromRawFiles)
+          toIsCustom = isCustomApp(toRawFiles)
+
+          // Download raw dependencies for both versions in parallel
+          const fromAccounts = fromManifest.dependencies?.accounts || []
+          const toAccounts = toManifest.dependencies?.accounts || []
+          const fromHooks = fromManifest.dependencies?.hooks || []
+          const toHooks = toManifest.dependencies?.hooks || []
+          const allAccounts = [...new Set([...fromAccounts, ...toAccounts])]
+          const allHooks = [...new Set([...fromHooks, ...toHooks])]
+
+          const depResults = await Promise.all([
+            downloadRawDeps(
+              ipmClient,
+              allAccounts.filter((d) => fromAccounts.includes(d)),
+              fromVersion,
+              'account'
+            ),
+            downloadRawDeps(
+              ipmClient,
+              allAccounts.filter((d) => toAccounts.includes(d)),
+              toVersion,
+              'account'
+            ),
+            downloadRawDeps(
+              ipmClient,
+              allHooks.filter((d) => fromHooks.includes(d)),
+              fromVersion,
+              'hook'
+            ),
+            downloadRawDeps(
+              ipmClient,
+              allHooks.filter((d) => toHooks.includes(d)),
+              toVersion,
+              'hook'
+            )
+          ])
+          fromAccDeps = depResults[0]
+          toAccDeps = depResults[1]
+          fromHookDeps = depResults[2]
+          toHookDeps = depResults[3]
+
+          // Save to cache
+          diffCache = {
+            appName,
+            fromVersion,
+            toVersion,
+            fromFiles: fromRawFiles,
+            toFiles: toRawFiles,
+            fromIsCustom,
+            toIsCustom,
+            fromAccDeps,
+            toAccDeps,
+            fromHookDeps,
+            toHookDeps
+          }
+        }
+
+        // Apply decompile based on flag
+        const fromFiles =
+          fromIsCustom && decompile ? decompileApp(cloneFiles(fromRawFiles), appName) : cloneFiles(fromRawFiles)
+        const toFiles = toIsCustom && decompile ? decompileApp(cloneFiles(toRawFiles), appName) : cloneFiles(toRawFiles)
+
+        fromFiles.push(
+          ...applyDepsDecompile(fromAccDeps, 'account', fromIsCustom, decompile),
+          ...applyDepsDecompile(fromHookDeps, 'hook', fromIsCustom, decompile)
         )
-      ])
-      fromFiles.push(...fromAccFiles, ...fromHookFiles)
-      toFiles.push(...toAccFiles, ...toHookFiles)
+        toFiles.push(
+          ...applyDepsDecompile(toAccDeps, 'account', toIsCustom, decompile),
+          ...applyDepsDecompile(toHookDeps, 'hook', toIsCustom, decompile)
+        )
 
-      const diffResult = computeDiff('app', fromFiles, toFiles)
-      return { success: true, data: diffResult }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { success: false, error: message }
+        const diffResult = computeDiff('app', fromFiles, toFiles)
+        return {
+          success: true,
+          data: { ...diffResult, isCustomApp: fromIsCustom || toIsCustom }
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { success: false, error: message }
+      }
     }
-  })
+  )
 
-  ipcMain.handle('ipm:show-version', async (_event, appName: string, version: string) => {
+  ipcMain.handle('ipm:show-version', async (_event, appName: string, version: string, decompile: boolean = true) => {
     try {
-      const [appBuffer, manifest] = await Promise.all([
-        ipmClient.downloadComponent(appName, version, 'app'),
-        ipmClient.getManifest(appName, version)
-      ])
+      const cacheHit = showCache && showCache.appName === appName && showCache.version === version
 
-      let files: ExtractedFile[] = extractPkr(appBuffer)
-      const isCustom = isCustomApp(files)
-      if (isCustom) files = decompileApp(files, appName)
+      let rawFiles: ExtractedFile[]
+      let isCustom: boolean
+      let accDeps: RawDepEntry[]
+      let hookDeps: RawDepEntry[]
 
-      // Download dependencies
-      const accounts = manifest.dependencies?.accounts || []
-      const hooks = manifest.dependencies?.hooks || []
-      const [accFiles, hookFiles] = await Promise.all([
-        downloadDepsForVersion(ipmClient, accounts, version, 'account', isCustom),
-        downloadDepsForVersion(ipmClient, hooks, version, 'hook', isCustom)
-      ])
-      files.push(...accFiles, ...hookFiles)
+      if (cacheHit) {
+        rawFiles = showCache!.files
+        isCustom = showCache!.isCustom
+        accDeps = showCache!.accDeps
+        hookDeps = showCache!.hookDeps
+      } else {
+        const [appBuffer, manifest] = await Promise.all([
+          ipmClient.downloadComponent(appName, version, 'app'),
+          ipmClient.getManifest(appName, version)
+        ])
+
+        rawFiles = cloneFiles(extractPkr(appBuffer))
+        isCustom = isCustomApp(rawFiles)
+
+        const accounts = manifest.dependencies?.accounts || []
+        const hooks = manifest.dependencies?.hooks || []
+        const showDepResults = await Promise.all([
+          downloadRawDeps(ipmClient, accounts, version, 'account'),
+          downloadRawDeps(ipmClient, hooks, version, 'hook')
+        ])
+        accDeps = showDepResults[0]
+        hookDeps = showDepResults[1]
+
+        showCache = { appName, version, files: rawFiles, isCustom, accDeps, hookDeps }
+      }
+
+      const files = isCustom && decompile ? decompileApp(cloneFiles(rawFiles), appName) : cloneFiles(rawFiles)
+
+      files.push(
+        ...applyDepsDecompile(accDeps, 'account', isCustom, decompile),
+        ...applyDepsDecompile(hookDeps, 'hook', isCustom, decompile)
+      )
 
       const diffResult = computeDiff('app', [], files)
-      return { success: true, data: diffResult }
+      return {
+        success: true,
+        data: { ...diffResult, isCustomApp: isCustom }
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
