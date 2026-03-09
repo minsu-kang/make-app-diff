@@ -236,7 +236,7 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Show mode: `Editor` (read-only single file view)
 - Image files: custom JSX preview (data:image/* detection via `isValidDataUri`)
 - Search (Cmd+F), scroll sync, code folding, word diff: all Monaco native
-- Unchanged region collapsing: `hideUnchangedRegions` (3 context lines, min 8 lines)
+- Unchanged region collapsing: `hideUnchangedRegions` (UI-only, full content still in model; Expand All disables collapsing)
 - Copy button: copies file content (show mode) or unified diff (diff mode)
 - Open in VS Code button: writes temp files and runs `code --diff` via `editor:open-diff`
 - Expand All button: reveals all collapsed unchanged regions

@@ -86,13 +86,13 @@ export default function DiffViewer({
 
   const handleCopyContent = useCallback(async () => {
     if (!visibleDiff) return
-    const text = viewMode === 'show' ? visibleDiff.newContent || visibleDiff.oldContent : visibleDiff.unifiedDiff
+    const text = viewMode === 'show' ? (visibleDiff.newContent ?? visibleDiff.oldContent) : visibleDiff.unifiedDiff
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    } catch {
-      showToast('Failed to copy to clipboard', 'error')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to copy to clipboard', 'error')
     }
   }, [visibleDiff, viewMode])
 
@@ -109,22 +109,18 @@ export default function DiffViewer({
       if (!result.success) {
         showToast(result.error || 'Failed to open VS Code', 'error')
       }
-    } catch {
-      showToast('Failed to open VS Code', 'error')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
     }
   }, [visibleDiff, fromVersion, toVersion])
 
   const handleExpandAll = useCallback(() => {
-    const editor = diffEditorRef.current
-    if (!editor) return
-    // Reveal all hidden unchanged regions
-    const modifiedEditor = editor.getModifiedEditor()
-    const model = modifiedEditor.getModel()
-    if (model) {
-      const lineCount = model.getLineCount()
-      modifiedEditor.revealLine(1)
-      modifiedEditor.revealLine(lineCount)
-    }
+    const diffEditor = diffEditorRef.current
+    if (!diffEditor) return
+    // Toggle hideUnchangedRegions off to reveal all regions
+    diffEditor.updateOptions({
+      hideUnchangedRegions: { enabled: false }
+    })
   }, [])
 
   const handleDiffEditorMount = useCallback((editor: editor.IDiffEditor) => {
@@ -153,16 +149,6 @@ export default function DiffViewer({
 
   // Image preview
   const isImage = visibleDiff.oldContent.startsWith('data:image/') || visibleDiff.newContent.startsWith('data:image/')
-
-  if (isImage) {
-    return (
-      <div className="diff-viewer">
-        <FileBreadcrumb filePath={selectedFile} />
-        <div className="diff-container">{renderImagePreview(visibleDiff)}</div>
-      </div>
-    )
-  }
-
   const language = getLanguageForFile(selectedFile)
   const pathParts = selectedFile.split('/')
 
@@ -183,12 +169,12 @@ export default function DiffViewer({
           >
             {copied ? '\u2713' : 'Copy'}
           </button>
-          {viewMode === 'diff' && (
+          {viewMode === 'diff' && !isImage && (
             <button className="diff-action-btn" onClick={handleOpenInVSCode} title="Open in VS Code diff">
               VS Code
             </button>
           )}
-          {viewMode === 'diff' && (
+          {viewMode === 'diff' && !isImage && (
             <button className="diff-action-btn" onClick={handleExpandAll} title="Expand all hidden regions">
               Expand All
             </button>
@@ -197,10 +183,12 @@ export default function DiffViewer({
       </div>
 
       <div className="diff-container">
-        {viewMode === 'show' ? (
+        {isImage ? (
+          renderImagePreview(visibleDiff)
+        ) : viewMode === 'show' ? (
           <Editor
             language={language}
-            value={visibleDiff.newContent || visibleDiff.oldContent}
+            value={visibleDiff.newContent ?? visibleDiff.oldContent}
             theme={monacoTheme}
             options={EDITOR_OPTIONS}
             onMount={handleEditorMount}
@@ -225,20 +213,6 @@ export default function DiffViewer({
           />
         )}
       </div>
-    </div>
-  )
-}
-
-function FileBreadcrumb({ filePath }: { filePath: string }) {
-  const parts = filePath.split('/')
-  return (
-    <div className="diff-file-path">
-      {parts.map((part, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <span className="diff-file-path-sep">/</span>}
-          <span className={i === parts.length - 1 ? 'diff-file-path-name' : ''}>{part}</span>
-        </React.Fragment>
-      ))}
     </div>
   )
 }
