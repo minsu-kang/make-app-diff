@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0](https://github.com/minsu-kang/make-app-diff/compare/v1.3.2...v1.4.0) (2026-03-09)
+
+
+### Features
+
+* replace diff2html with Monaco DiffEditor ([c0e8a2b](https://github.com/minsu-kang/make-app-diff/commit/c0e8a2b72f8486528c60a73a6ef3b10f1f7646fc))
+* replace diff2html with Monaco DiffEditor for accurate diffs ([a494eb8](https://github.com/minsu-kang/make-app-diff/commit/a494eb80e11c0f169d89bb62b1e68e9c1b40a181))
+
+
+### Bug Fixes
+
+* address CodeRabbit review feedback ([28a4d5e](https://github.com/minsu-kang/make-app-diff/commit/28a4d5e5e190b181d9029d75e70177bdf943bbfc))
+* make app icon background transparent ([e14fb77](https://github.com/minsu-kang/make-app-diff/commit/e14fb77b33b6159c5ecad9c3377f08b9b8805f15))
+
 ## [1.3.2](https://github.com/minsu-kang/make-app-diff/compare/v1.3.1...v1.3.2) (2026-03-08)
 
 
