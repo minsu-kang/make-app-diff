@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.1](https://github.com/minsu-kang/make-app-diff/compare/v1.4.0...v1.4.1) (2026-03-09)
+
+
+### Bug Fixes
+
+* resolve VS Code CLI path and fix find widget tooltip flicker ([c517740](https://github.com/minsu-kang/make-app-diff/commit/c5177405905a77d110beee35b1733b1b84314cf5))
+* resolve VS Code CLI path and fix find widget tooltip flicker ([0afa8ce](https://github.com/minsu-kang/make-app-diff/commit/0afa8ceaf4ec1f7978d122084996bcba73baf7b5))
+* use execFile to prevent shell injection, narrow tooltip suppression ([8542db9](https://github.com/minsu-kang/make-app-diff/commit/8542db931d90377299458696782da366214ca747))
+
 ## [1.4.0](https://github.com/minsu-kang/make-app-diff/compare/v1.3.2...v1.4.0) (2026-03-09)
 
 
