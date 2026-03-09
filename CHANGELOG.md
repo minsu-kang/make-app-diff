@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2](https://github.com/minsu-kang/make-app-diff/compare/v1.4.1...v1.4.2) (2026-03-09)
+
+
+### Bug Fixes
+
+* cache update check and show rate limit error ([3dac11d](https://github.com/minsu-kang/make-app-diff/commit/3dac11d03c290dffac18c1220edce9aaf877f4f4))
+* cache update check response and show specific rate limit error ([3986540](https://github.com/minsu-kang/make-app-diff/commit/3986540433b4aa9af66836f29cea15fb8c520297)), closes [#28](https://github.com/minsu-kang/make-app-diff/issues/28)
+
 ## [1.4.1](https://github.com/minsu-kang/make-app-diff/compare/v1.4.0...v1.4.1) (2026-03-09)
 
 
