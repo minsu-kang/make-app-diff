@@ -37,6 +37,12 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   }
 }
 
+const HIDE_UNCHANGED_REGIONS_CONFIG = {
+  contextLineCount: 3,
+  minimumLineCount: 8,
+  revealLineCount: 20
+}
+
 const DIFF_EDITOR_OPTIONS: editor.IDiffEditorConstructionOptions = {
   ...EDITOR_OPTIONS,
   renderSideBySide: true,
@@ -48,9 +54,7 @@ const DIFF_EDITOR_OPTIONS: editor.IDiffEditorConstructionOptions = {
   renderMarginRevertIcon: false,
   hideUnchangedRegions: {
     enabled: true,
-    contextLineCount: 3,
-    minimumLineCount: 8,
-    revealLineCount: 20
+    ...HIDE_UNCHANGED_REGIONS_CONFIG
   },
   experimental: {
     showMoves: true
@@ -90,6 +94,9 @@ export default function DiffViewer({
   // Reset expanded state when switching files
   useEffect(() => {
     setIsExpanded(false)
+    diffEditorRef.current?.updateOptions({
+      hideUnchangedRegions: { enabled: true, ...HIDE_UNCHANGED_REGIONS_CONFIG }
+    })
   }, [selectedFile])
 
   // Track theme changes
@@ -138,9 +145,7 @@ export default function DiffViewer({
     if (!diffEditor) return
     const next = !isExpanded
     diffEditor.updateOptions({
-      hideUnchangedRegions: next
-        ? { enabled: false }
-        : { enabled: true, contextLineCount: 3, minimumLineCount: 8, revealLineCount: 20 }
+      hideUnchangedRegions: next ? { enabled: false } : { enabled: true, ...HIDE_UNCHANGED_REGIONS_CONFIG }
     })
     setIsExpanded(next)
   }, [isExpanded])
