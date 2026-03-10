@@ -66,6 +66,7 @@ export default function DiffViewer({
 }: DiffViewerProps) {
   const [monacoTheme, setMonacoTheme] = useState(getMonacoTheme)
   const [copied, setCopied] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const diffEditorRef = useRef<editor.IDiffEditor | null>(null)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
@@ -85,6 +86,11 @@ export default function DiffViewer({
     () => (selectedFile ? diffs.find((d) => d.filePath === selectedFile) : null),
     [diffs, selectedFile]
   )
+
+  // Reset expanded state when switching files
+  useEffect(() => {
+    setIsExpanded(false)
+  }, [selectedFile])
 
   // Track theme changes
   useEffect(() => {
@@ -130,11 +136,14 @@ export default function DiffViewer({
   const handleExpandAll = useCallback(() => {
     const diffEditor = diffEditorRef.current
     if (!diffEditor) return
-    // Toggle hideUnchangedRegions off to reveal all regions
+    const next = !isExpanded
     diffEditor.updateOptions({
-      hideUnchangedRegions: { enabled: false }
+      hideUnchangedRegions: next
+        ? { enabled: false }
+        : { enabled: true, contextLineCount: 3, minimumLineCount: 8, revealLineCount: 20 }
     })
-  }, [])
+    setIsExpanded(next)
+  }, [isExpanded])
 
   const handleDiffEditorMount = useCallback((editor: editor.IDiffEditor) => {
     diffEditorRef.current = editor
@@ -188,8 +197,12 @@ export default function DiffViewer({
             </button>
           )}
           {viewMode === 'diff' && !isImage && (
-            <button className="diff-action-btn" onClick={handleExpandAll} title="Expand all hidden regions">
-              Expand All
+            <button
+              className="diff-action-btn"
+              onClick={handleExpandAll}
+              title={isExpanded ? 'Collapse all regions' : 'Expand all hidden regions'}
+            >
+              {isExpanded ? 'Collapse All' : 'Expand All'}
             </button>
           )}
         </div>
