@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.3](https://github.com/minsu-kang/make-app-diff/compare/v1.4.2...v1.4.3) (2026-03-10)
+
+
+### Bug Fixes
+
+* track major version in favorites/recents and harden IPC ([6cb9b84](https://github.com/minsu-kang/make-app-diff/commit/6cb9b843b6238e5e623b90b84563efbb6b9d72f1))
+* track major version in favorites/recents and harden IPC inputs ([f30bdbd](https://github.com/minsu-kang/make-app-diff/commit/f30bdbd33448345adc589a1ae87dc3920394a6c7))
+* wrap favorites:save handler in try/catch per IPC convention ([44bbbac](https://github.com/minsu-kang/make-app-diff/commit/44bbbac0463ac15363338986f6634c75746dc986))
+
 ## [1.4.2](https://github.com/minsu-kang/make-app-diff/compare/v1.4.1...v1.4.2) (2026-03-09)
 
 
