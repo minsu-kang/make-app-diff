@@ -130,7 +130,7 @@ describe('loadFavorites', () => {
 
 describe('saveFavorites', () => {
   it('calls store.set with favorites', () => {
-    const favorites = [{ name: 'slack', label: 'Slack', addedAt: 1706745600000 }]
+    const favorites = [{ name: 'slack', label: 'Slack', major: 1, addedAt: 1706745600000 }]
     saveFavorites(favorites)
     expect(mockSet).toHaveBeenCalledWith('favorites', favorites)
   })
@@ -138,7 +138,7 @@ describe('saveFavorites', () => {
 
 describe('loadRecentApps', () => {
   it('returns stored recent apps', () => {
-    const recent = [{ name: 'github', label: 'GitHub', lastViewed: 1709251200000 }]
+    const recent = [{ name: 'github', label: 'GitHub', major: 1, lastViewed: 1709251200000 }]
     mockGet.mockReturnValueOnce(recent)
     expect(loadRecentApps()).toEqual(recent)
   })
@@ -151,7 +151,7 @@ describe('loadRecentApps', () => {
 
 describe('saveRecentApps', () => {
   it('calls store.set with recentApps', () => {
-    const recent = [{ name: 'jira', label: 'Jira', lastViewed: 1711929600000 }]
+    const recent = [{ name: 'jira', label: 'Jira', major: 1, lastViewed: 1711929600000 }]
     saveRecentApps(recent)
     expect(mockSet).toHaveBeenCalledWith('recentApps', recent)
   })

@@ -20,7 +20,19 @@ import {
   saveRecentApps
 } from './services/storage'
 import { isCustomApp, decompileApp, decompileAccount, decompileHook } from './services/decompiler'
-import { IpmSettings, ComponentType, ExtractedFile } from './types'
+import { IpmSettings, ComponentType, ExtractedFile, FavoriteApp } from './types'
+
+function assertString(value: unknown, name: string): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Invalid ${name}: expected non-empty string`)
+  }
+}
+
+function assertNumber(value: unknown, name: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`Invalid ${name}: expected finite number`)
+  }
+}
 
 function sanitizePath(baseDir: string, filePath: string): string {
   const normalized = path.normalize(filePath)
@@ -188,10 +200,13 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('ipm:get-app-info', async (_event, appName: string) => {
+  ipcMain.handle('ipm:get-app-info', async (_event, appName: string, version?: string) => {
     try {
+      assertString(appName, 'appName')
+      if (version !== undefined) assertString(version, 'version')
       const info = await ipmClient.getAppInfo(appName)
-      const manifest = await ipmClient.getManifest(appName, info.version)
+      const manifestVersion = version || info.version
+      const manifest = await ipmClient.getManifest(appName, manifestVersion)
       info.label = ((manifest as Record<string, unknown>).label as string) || appName
 
       // Extract theme and iconHash from info.meta
@@ -415,21 +430,43 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('favorites:load', () => {
-    return { success: true, data: loadFavorites() }
+    const all = loadFavorites()
+    const valid = all.filter((f) => f.major != null)
+    if (valid.length !== all.length) saveFavorites(valid)
+    return { success: true, data: valid }
   })
 
   ipcMain.handle('favorites:save', (_event, favorites: FavoriteApp[]) => {
-    saveFavorites(favorites)
-    return { success: true }
+    try {
+      if (!Array.isArray(favorites)) throw new Error('Invalid favorites: expected array')
+      for (const f of favorites) {
+        assertString(f.name, 'favorite.name')
+        assertString(f.label, 'favorite.label')
+        assertNumber(f.major, 'favorite.major')
+      }
+      saveFavorites(favorites)
+      return { success: true }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
   })
 
   ipcMain.handle('recent:load', () => {
-    return { success: true, data: loadRecentApps() }
+    const all = loadRecentApps()
+    const valid = all.filter((r) => r.major != null)
+    if (valid.length !== all.length) saveRecentApps(valid)
+    return { success: true, data: valid }
   })
 
-  ipcMain.handle('recent:add', (_event, name: string, label: string) => {
-    const recent = loadRecentApps().filter((r) => r.name !== name)
-    recent.unshift({ name, label, lastViewed: Date.now() })
+  ipcMain.handle('recent:add', (_event, name: string, label: string, major: number) => {
+    assertString(name, 'name')
+    assertString(label, 'label')
+    assertNumber(major, 'major')
+    const recent = loadRecentApps()
+      .filter((r) => r.major != null)
+      .filter((r) => !(r.name === name && r.major === major))
+    recent.unshift({ name, label, major, lastViewed: Date.now() })
     const trimmed = recent.slice(0, 8)
     saveRecentApps(trimmed)
     return { success: true, data: trimmed }

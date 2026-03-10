@@ -64,7 +64,7 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 | `theme:load` | — | `string` |
 | `theme:save` | `string` | `{ success }` |
 | `ipm:search-apps` | — | `IpcResult<SearchAppResult[]>` |
-| `ipm:get-app-info` | `appName` | `IpcResult<AppInfo>` |
+| `ipm:get-app-info` | `appName, version?` | `IpcResult<AppInfo>` |
 | `ipm:download-and-extract` | `appName, version, type` | `IpcResult<ExtractedFile[]>` |
 | `ipm:get-diff` | `appName, from, to` | `IpcResult<DiffResult>` |
 | `ipm:get-app-icon` | `appName` | `IpcResult<string>` (data URL) |
@@ -74,7 +74,7 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 | `favorites:load` | — | `IpcResult<FavoriteApp[]>` |
 | `favorites:save` | `FavoriteApp[]` | `{ success }` |
 | `recent:load` | — | `IpcResult<RecentApp[]>` |
-| `recent:add` | `name, label` | `IpcResult<RecentApp[]>` |
+| `recent:add` | `name, label, major` | `IpcResult<RecentApp[]>` |
 | `editor:open-diff` | `{ filePath, fromVersion, toVersion, oldContent, newContent }` | `IpcResult<void>` |
 | `clipboard:copy-zip` | `{ appName, version, files: {path,content}[] }` | `IpcResult<string>` (zip path) |
 | `update:check` | — | `IpcResult<void>` |
@@ -82,7 +82,7 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 
 **Menu events:** `menu:download-app`, `menu:open-settings`, `menu:show-info`
 
-**Renderer events (main → renderer):** `update:available` (version string), `update:up-to-date`, `update:error`
+**Renderer events (main → renderer):** `update:available` (version string), `update:up-to-date`, `update:error` (message? string)
 
 ## Preload Exposed Objects
 
@@ -153,8 +153,8 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - `ExtractedComponent` — `{ type: ComponentType, files: ExtractedFile[] }`
 - `FileDiff` — `{ filePath, status, oldContent, newContent, unifiedDiff }`
 - `DiffResult` — `{ type, diffs[], summary { added, deleted, modified, unchanged } }`
-- `FavoriteApp` — `{ name, label, addedAt }`
-- `RecentApp` — `{ name, label, lastViewed }`
+- `FavoriteApp` — `{ name, label, major, addedAt }`
+- `RecentApp` — `{ name, label, major, lastViewed }`
 - `VersionTags` — `{ staging[], production[], stable[] }`
 - `SearchApp` — `{ name, label, version, availableVersions[] }`
 - `SearchEntry` — `{ app: SearchApp, major, versions[] }`
@@ -216,6 +216,8 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 ## Error Handling
 
 - IPC: try/catch wrapping, `instanceof Error` check, return `{ success: false, error: message }`
+- IPC input validation: `assertString`/`assertNumber` guards on key handlers (`get-app-info`, `recent:add`, `favorites:save`)
+- Favorites/recents: legacy entries without `major` field filtered out on load
 - Connection test: catches 403 specifically for invalid token
 - Dependency downloads: silently skipped on failure (empty catch)
 - Download dialog cancel: returns `{ success: false, error: 'Cancelled' }`
@@ -328,7 +330,7 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 2. Merge Release PR → GitHub Release created → `build-mac` + `build-win` jobs run in parallel
 3. DMG + EXE uploaded to Release assets
 
-**Update check:** App checks GitHub API (`/repos/{owner}/{repo}/releases/latest`) on startup and via File > Check for Updates. Shows dismissible banner with link to download.
+**Update check:** App checks GitHub API (`/repos/{owner}/{repo}/releases/latest`) on startup and via File > Check for Updates. Shows dismissible banner with link to download. Response is cached with 5-minute TTL to avoid rate limits. Rate limit (403 + `x-ratelimit-remaining: 0`) shows specific error message.
 
 **External integrations:**
 - CodeRabbit (`.coderabbit.yaml`) — AI code review on PRs

@@ -62,7 +62,8 @@ const api = {
   },
   recent: {
     load: (): Promise<IpcResult<RecentApp[]>> => ipcRenderer.invoke('recent:load'),
-    add: (name: string, label: string): Promise<IpcResult<RecentApp[]>> => ipcRenderer.invoke('recent:add', name, label)
+    add: (name: string, label: string, major: number): Promise<IpcResult<RecentApp[]>> =>
+      ipcRenderer.invoke('recent:add', name, label, major)
   },
   update: {
     check: (): Promise<IpcResult<void>> => ipcRenderer.invoke('update:check'),
@@ -85,7 +86,8 @@ const api = {
   },
   ipm: {
     searchApps: (): Promise<IpcResult<SearchAppResult[]>> => ipcRenderer.invoke('ipm:search-apps'),
-    getAppInfo: (appName: string): Promise<IpcResult<AppInfo>> => ipcRenderer.invoke('ipm:get-app-info', appName),
+    getAppInfo: (appName: string, version?: string): Promise<IpcResult<AppInfo>> =>
+      ipcRenderer.invoke('ipm:get-app-info', appName, version),
     getAppIcon: (appName: string): Promise<IpcResult<string>> => ipcRenderer.invoke('ipm:get-app-icon', appName),
     downloadAndExtract: (appName: string, version: string, type: ComponentType): Promise<IpcResult<ExtractedFile[]>> =>
       ipcRenderer.invoke('ipm:download-and-extract', appName, version, type),
