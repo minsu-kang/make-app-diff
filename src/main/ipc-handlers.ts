@@ -437,14 +437,19 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('favorites:save', (_event, favorites: FavoriteApp[]) => {
-    if (!Array.isArray(favorites)) throw new Error('Invalid favorites: expected array')
-    for (const f of favorites) {
-      assertString(f.name, 'favorite.name')
-      assertString(f.label, 'favorite.label')
-      assertNumber(f.major, 'favorite.major')
+    try {
+      if (!Array.isArray(favorites)) throw new Error('Invalid favorites: expected array')
+      for (const f of favorites) {
+        assertString(f.name, 'favorite.name')
+        assertString(f.label, 'favorite.label')
+        assertNumber(f.major, 'favorite.major')
+      }
+      saveFavorites(favorites)
+      return { success: true }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
     }
-    saveFavorites(favorites)
-    return { success: true }
   })
 
   ipcMain.handle('recent:load', () => {
