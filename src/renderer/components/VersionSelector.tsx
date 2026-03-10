@@ -39,11 +39,11 @@ export default function VersionSelector({
 
   const canCompare = fromVersion && toVersion && fromVersion !== toVersion && !loading
 
-  // Reset download version when app changes
+  // Reset download version when app or version list changes
   useEffect(() => {
     setDownloadVersion('')
     setDownloadedPath(null)
-  }, [appName])
+  }, [appName, versions])
 
   // Filter versions to active major version only
   const filteredVersions = useMemo(() => {

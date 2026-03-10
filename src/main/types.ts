@@ -82,12 +82,14 @@ export interface DiffResult {
 export interface FavoriteApp {
   name: string
   label: string
+  major: number
   addedAt: number
 }
 
 export interface RecentApp {
   name: string
   label: string
+  major: number
   lastViewed: number
 }
 

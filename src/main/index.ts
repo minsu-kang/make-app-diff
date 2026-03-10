@@ -71,7 +71,10 @@ export async function checkForUpdates(mainWindow: BrowserWindow, manual = false)
     }
   } catch (error: unknown) {
     if (manual) {
-      const isRateLimit = axios.isAxiosError(error) && error.response?.status === 403
+      const isRateLimit =
+        axios.isAxiosError(error) &&
+        error.response?.status === 403 &&
+        error.response?.headers?.['x-ratelimit-remaining'] === '0'
       const message = isRateLimit
         ? 'GitHub API rate limit exceeded. Please try again later.'
         : 'Could not check for updates'

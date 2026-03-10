@@ -14,7 +14,7 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
   const [allApps, setAllApps] = useState<SearchApp[]>([])
   const [loadingApps, setLoadingApps] = useState(false)
   const [selectedApp, setSelectedApp] = useState<AppInfo | null>(null)
-  const [loadingInfo, setLoadingInfo] = useState(false)
+  const [selectedMajor, setSelectedMajor] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [favorites, setFavorites] = useState<FavoriteApp[]>([])
@@ -89,12 +89,17 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
     setHighlightedIndex(-1)
   }, [searchQuery])
 
+  const getVersionsForMajor = (name: string, major: number): string[] => {
+    const app = allApps.find((a) => a.name === name)
+    if (!app) return []
+    return app.availableVersions.filter((v) => getMajor(v) === major)
+  }
+
   const handleSelect = async (entry: SearchEntry) => {
     setSearchQuery('')
-    setLoadingInfo(true)
     setError(null)
     try {
-      const result = await window.api.ipm.getAppInfo(entry.app.name)
+      const result = await window.api.ipm.getAppInfo(entry.app.name, entry.versions[0])
       if (result.success && result.data) {
         const info = {
           ...result.data,
@@ -102,9 +107,9 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
           version: entry.versions[0]
         }
         setSelectedApp(info)
+        setSelectedMajor(entry.major)
         onAppSelect(info)
-        // Add to recents
-        window.api.recent.add(entry.app.name, entry.app.label).then((r) => {
+        window.api.recent.add(entry.app.name, info.label || entry.app.name, entry.major).then((r) => {
           if (r.success && r.data) setRecentApps(r.data)
         })
       } else {
@@ -112,23 +117,22 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoadingInfo(false)
     }
   }
 
-  const handleQuickSelect = async (name: string, label: string) => {
-    setLoadingInfo(true)
+  const handleQuickSelect = async (name: string, label: string, major: number) => {
     setError(null)
     try {
-      const result = await window.api.ipm.getAppInfo(name)
+      const versions = getVersionsForMajor(name, major)
+      const latestVersion = versions.length > 0 ? versions[0] : undefined
+      const result = await window.api.ipm.getAppInfo(name, latestVersion)
       if (result.success && result.data) {
-        const app = allApps.find((a) => a.name === name)
-        const versions = app ? app.availableVersions : result.data.versions
-        const info = { ...result.data, versions, version: versions[0] }
+        const fallbackVersions = versions.length > 0 ? versions : result.data.versions
+        const info = { ...result.data, versions: fallbackVersions, version: fallbackVersions[0] }
         setSelectedApp(info)
+        setSelectedMajor(major)
         onAppSelect(info)
-        window.api.recent.add(name, label).then((r) => {
+        window.api.recent.add(name, info.label || label, major).then((r) => {
           if (r.success && r.data) setRecentApps(r.data)
         })
       } else {
@@ -136,21 +140,19 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoadingInfo(false)
     }
   }
 
-  const toggleFavorite = (name: string, label: string) => {
-    const exists = favorites.some((f) => f.name === name)
+  const toggleFavorite = (name: string, label: string, major: number) => {
+    const exists = favorites.some((f) => f.name === name && f.major === major)
     const updated = exists
-      ? favorites.filter((f) => f.name !== name)
-      : [...favorites, { name, label, addedAt: Date.now() }]
+      ? favorites.filter((f) => !(f.name === name && f.major === major))
+      : [...favorites, { name, label, major, addedAt: Date.now() }]
     setFavorites(updated)
     window.api.favorites.save(updated)
   }
 
-  const isFavorite = (name: string) => favorites.some((f) => f.name === name)
+  const isFavorite = (name: string, major: number | null) => favorites.some((f) => f.name === name && f.major === major)
 
   return (
     <div className="sidebar">
@@ -241,8 +243,6 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
         <div className="search-no-results">No apps found</div>
       )}
 
-      {loadingInfo && <div className="search-no-results">Loading...</div>}
-
       {!searchQuery.trim() && (favorites.length > 0 || recentApps.length > 0) && (
         <div className="sidebar-sections">
           {favorites.length > 0 && (
@@ -257,12 +257,15 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
                 <ul className="sidebar-section-list">
                   {favorites.map((fav) => (
                     <li
-                      key={fav.name}
-                      className={`sidebar-app-item ${selectedApp?.name === fav.name ? 'active' : ''}`}
-                      onClick={() => handleQuickSelect(fav.name, fav.label)}
+                      key={`${fav.name}-${fav.major}`}
+                      className={`sidebar-app-item ${selectedApp?.name === fav.name && selectedMajor === fav.major ? 'active' : ''}`}
+                      onClick={() => !loadingApps && handleQuickSelect(fav.name, fav.label, fav.major)}
                     >
                       <span className="sidebar-app-item-label">{fav.label}</span>
-                      <span className="sidebar-app-item-name">{fav.name}</span>
+                      <span className="sidebar-app-item-name">
+                        {fav.name}
+                        {` · v${fav.major}`}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -282,12 +285,15 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
                 <ul className="sidebar-section-list">
                   {recentApps.map((app) => (
                     <li
-                      key={app.name}
-                      className={`sidebar-app-item ${selectedApp?.name === app.name ? 'active' : ''}`}
-                      onClick={() => handleQuickSelect(app.name, app.label)}
+                      key={`${app.name}-${app.major}`}
+                      className={`sidebar-app-item ${selectedApp?.name === app.name && selectedMajor === app.major ? 'active' : ''}`}
+                      onClick={() => !loadingApps && handleQuickSelect(app.name, app.label, app.major)}
                     >
                       <span className="sidebar-app-item-label">{app.label}</span>
-                      <span className="sidebar-app-item-name">{app.name}</span>
+                      <span className="sidebar-app-item-name">
+                        {app.name}
+                        {` · v${app.major}`}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -310,13 +316,15 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
               )}
             </div>
             <h3>{selectedApp.label || selectedApp.name}</h3>
-            <button
-              className={`btn-favorite ${isFavorite(selectedApp.name) ? 'active' : ''}`}
-              onClick={() => toggleFavorite(selectedApp.name, selectedApp.label || selectedApp.name)}
-              title={isFavorite(selectedApp.name) ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              {isFavorite(selectedApp.name) ? '\u2605' : '\u2606'}
-            </button>
+            {selectedMajor != null && (
+              <button
+                className={`btn-favorite ${isFavorite(selectedApp.name, selectedMajor) ? 'active' : ''}`}
+                onClick={() => toggleFavorite(selectedApp.name, selectedApp.label || selectedApp.name, selectedMajor)}
+                title={isFavorite(selectedApp.name, selectedMajor) ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                {isFavorite(selectedApp.name, selectedMajor) ? '\u2605' : '\u2606'}
+              </button>
+            )}
           </div>
           <p className="app-name">{selectedApp.name}</p>
           <p className="app-version">Latest: v{selectedApp.version}</p>
