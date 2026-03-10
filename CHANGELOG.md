@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.4](https://github.com/minsu-kang/make-app-diff/compare/v1.4.3...v1.4.4) (2026-03-10)
+
+
+### Bug Fixes
+
+* sync editor hideUnchangedRegions on file switch and extract config constant ([215156d](https://github.com/minsu-kang/make-app-diff/commit/215156deeebacc4c208f6406c1114073cbe01d8f))
+* toggle Expand All / Collapse All button ([081ee40](https://github.com/minsu-kang/make-app-diff/commit/081ee406634079882922c0968d7f3ee507383958))
+* toggle Expand All button to Collapse All after click ([c0f884a](https://github.com/minsu-kang/make-app-diff/commit/c0f884a78ecd7226a8c6b830bde63ca779a61769))
+
 ## [1.4.3](https://github.com/minsu-kang/make-app-diff/compare/v1.4.2...v1.4.3) (2026-03-10)
 
 
