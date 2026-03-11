@@ -101,10 +101,11 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
     try {
       const result = await window.api.ipm.getAppInfo(entry.app.name, entry.versions[0])
       if (result.success && result.data) {
+        const apiVersions = result.data.versions.filter((v) => getMajor(v) === entry.major)
         const info = {
           ...result.data,
-          versions: entry.versions,
-          version: entry.versions[0]
+          versions: apiVersions.length > 0 ? apiVersions : result.data.versions,
+          version: apiVersions[0] || result.data.version
         }
         setSelectedApp(info)
         setSelectedMajor(entry.major)
@@ -127,8 +128,12 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
       const latestVersion = versions.length > 0 ? versions[0] : undefined
       const result = await window.api.ipm.getAppInfo(name, latestVersion)
       if (result.success && result.data) {
-        const fallbackVersions = versions.length > 0 ? versions : result.data.versions
-        const info = { ...result.data, versions: fallbackVersions, version: fallbackVersions[0] }
+        const apiVersions = result.data.versions.filter((v) => getMajor(v) === major)
+        const info = {
+          ...result.data,
+          versions: apiVersions.length > 0 ? apiVersions : result.data.versions,
+          version: apiVersions[0] || result.data.version
+        }
         setSelectedApp(info)
         setSelectedMajor(major)
         onAppSelect(info)
