@@ -1,6 +1,6 @@
 {
   "name": "make-app-diff",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Make.com app version diff viewer",
   "main": "./out/main/index.js",
   "scripts": {
