@@ -220,8 +220,8 @@ export function registerIpcHandlers(): void {
       if (version !== undefined) assertString(version, 'version')
       const info = await ipmClient.getAppInfo(appName)
       info.versions.sort(compareSemverDesc)
-      if (info.versions.length > 0) info.version = info.versions[0]
-      const manifestVersion = version || info.version
+      const manifestVersion = version ?? info.versions[0] ?? info.version
+      info.version = manifestVersion
       const manifest = await ipmClient.getManifest(appName, manifestVersion)
       info.label = ((manifest as Record<string, unknown>).label as string) || appName
 
