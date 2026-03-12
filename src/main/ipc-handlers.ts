@@ -17,7 +17,10 @@ import {
   loadFavorites,
   saveFavorites,
   loadRecentApps,
-  saveRecentApps
+  saveRecentApps,
+  touchActivity,
+  isSessionExpired,
+  clearTokens
 } from './services/storage'
 import { isCustomApp, decompileApp, decompileAccount, decompileHook } from './services/decompiler'
 import { IpmSettings, ComponentType, ExtractedFile, FavoriteApp } from './types'
@@ -163,6 +166,15 @@ export function registerIpcHandlers(): void {
   const settings = loadSettings()
   ipmClient = new IpmClient(settings)
 
+  ipcMain.handle('session:check', () => {
+    if (isSessionExpired()) {
+      clearTokens()
+      ipmClient.updateSettings(loadSettings())
+      return { expired: true }
+    }
+    return { expired: false }
+  })
+
   ipcMain.handle('settings:load', () => {
     return loadSettings()
   })
@@ -186,6 +198,7 @@ export function registerIpcHandlers(): void {
     }
     saveSettings(settings)
     ipmClient.updateSettings(settings)
+    touchActivity()
     enableMenuItems()
     return { success: true }
   })
@@ -193,6 +206,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ipm:search-apps', async () => {
     try {
       const results = await ipmClient.searchApps()
+      touchActivity()
       return { success: true, data: results }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
@@ -361,6 +375,7 @@ export function registerIpcHandlers(): void {
         )
 
         const diffResult = computeDiff('app', fromFiles, toFiles)
+        touchActivity()
         return {
           success: true,
           data: { ...diffResult, isCustomApp: fromIsCustom || toIsCustom }
@@ -415,6 +430,7 @@ export function registerIpcHandlers(): void {
       )
 
       const diffResult = computeDiff('app', [], files)
+      touchActivity()
       return {
         success: true,
         data: { ...diffResult, isCustomApp: isCustom }

@@ -30,6 +30,9 @@ export type {
 } from '../main/types'
 
 const api = {
+  session: {
+    check: (): Promise<{ expired: boolean }> => ipcRenderer.invoke('session:check')
+  },
   showInFinder: (fullPath: string): Promise<void> => ipcRenderer.invoke('shell:show-in-finder', fullPath),
   editor: {
     openDiff: (opts: {
