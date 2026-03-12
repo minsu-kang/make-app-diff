@@ -73,16 +73,38 @@ export default function App() {
       document.documentElement.setAttribute('data-theme', theme)
     })
 
-    // Check if token is valid on startup
-    window.api.settings.load().then((settings) => {
-      const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
-      if (!token || !token.trim()) {
+    // Check session expiry, then check if token exists
+    window.api.session.check().then(({ expired }) => {
+      if (expired) {
+        showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
         setForcedSettings(true)
         setShowSettings(true)
+        return
       }
+      window.api.settings.load().then((settings) => {
+        const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
+        if (!token || !token.trim()) {
+          setForcedSettings(true)
+          setShowSettings(true)
+        }
+      })
     })
 
+    // Periodic session check (every 30 minutes)
+    const sessionInterval = setInterval(
+      async () => {
+        const { expired } = await window.api.session.check()
+        if (expired) {
+          showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
+          setForcedSettings(true)
+          setShowSettings(true)
+        }
+      },
+      30 * 60 * 1000
+    )
+
     return () => {
+      clearInterval(sessionInterval)
       cleanupSettings()
       cleanupDownload()
       cleanupInfo()
@@ -192,6 +214,21 @@ export default function App() {
     setDecompile(newDecompile)
     if (toVersion) handleShow(toVersion, newDecompile)
   }, [decompile, toVersion, handleShow])
+
+  const handleOpenVscode = useCallback(async () => {
+    if (!appInfo || !diffResult || !toVersion) return
+    const files = diffResult.diffs
+      .filter((d) => d.newContent)
+      .map((d) => ({ path: d.filePath, content: d.newContent! }))
+    const result = await window.api.editor.openInVscode({
+      appName: appInfo.name,
+      version: toVersion,
+      files
+    })
+    if (!result.success) {
+      showToast(result.error || 'Failed to open VS Code', 'error')
+    }
+  }, [appInfo, diffResult, toVersion])
 
   const currentDiffs = useMemo(() => {
     if (!diffResult) return []
@@ -425,6 +462,7 @@ export default function App() {
                   isCustomApp={viewMode === 'show' ? diffResult?.isCustomApp : undefined}
                   decompile={decompile}
                   onDecompileToggle={handleDecompileToggle}
+                  onOpenVscode={viewMode === 'show' ? handleOpenVscode : undefined}
                 />
 
                 <div className="diff-layout">

@@ -30,6 +30,9 @@ export type {
 } from '../main/types'
 
 const api = {
+  session: {
+    check: (): Promise<{ expired: boolean }> => ipcRenderer.invoke('session:check')
+  },
   showInFinder: (fullPath: string): Promise<void> => ipcRenderer.invoke('shell:show-in-finder', fullPath),
   editor: {
     openDiff: (opts: {
@@ -38,7 +41,12 @@ const api = {
       toVersion: string
       oldContent: string
       newContent: string
-    }): Promise<IpcResult<void>> => ipcRenderer.invoke('editor:open-diff', opts)
+    }): Promise<IpcResult<void>> => ipcRenderer.invoke('editor:open-diff', opts),
+    openInVscode: (opts: {
+      appName: string
+      version: string
+      files: { path: string; content: string }[]
+    }): Promise<IpcResult<void>> => ipcRenderer.invoke('editor:open-in-vscode', opts)
   },
   clipboard: {
     copyZip: (opts: {

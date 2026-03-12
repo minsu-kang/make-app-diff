@@ -6,6 +6,7 @@ interface StoreSchema {
   theme: string
   favorites: FavoriteApp[]
   recentApps: RecentApp[]
+  lastActiveAt: number
 }
 
 const defaults: StoreSchema = {
@@ -18,7 +19,8 @@ const defaults: StoreSchema = {
   },
   theme: 'dark',
   favorites: [],
-  recentApps: []
+  recentApps: [],
+  lastActiveAt: 0
 }
 
 const store = new Store<StoreSchema>({ defaults })
@@ -60,4 +62,24 @@ export function loadRecentApps(): RecentApp[] {
 
 export function saveRecentApps(recent: RecentApp[]): void {
   store.set('recentApps', recent)
+}
+
+const SESSION_TIMEOUT = 48 * 60 * 60 * 1000 // 48 hours
+
+export function touchActivity(): void {
+  store.set('lastActiveAt', Date.now())
+}
+
+export function isSessionExpired(): boolean {
+  const lastActive = store.get('lastActiveAt')
+  if (!lastActive) return false
+  return Date.now() - lastActive > SESSION_TIMEOUT
+}
+
+export function clearTokens(): void {
+  const settings = loadSettings()
+  settings.ipmToken = ''
+  settings.ipmeToken = ''
+  saveSettings(settings)
+  store.set('lastActiveAt', 0)
 }

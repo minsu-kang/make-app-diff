@@ -17,7 +17,10 @@ import {
   loadFavorites,
   saveFavorites,
   loadRecentApps,
-  saveRecentApps
+  saveRecentApps,
+  touchActivity,
+  isSessionExpired,
+  clearTokens
 } from './services/storage'
 import { isCustomApp, decompileApp, decompileAccount, decompileHook } from './services/decompiler'
 import { IpmSettings, ComponentType, ExtractedFile, FavoriteApp } from './types'
@@ -121,6 +124,17 @@ function cloneFiles(files: ExtractedFile[]): ExtractedFile[] {
   return files.map((f) => ({ path: f.path, content: f.content }))
 }
 
+/** Push files into target, skipping paths that already exist (app rpc.js data wins over hook defaults) */
+function pushNewFiles(target: ExtractedFile[], source: ExtractedFile[]): void {
+  const existing = new Set(target.map((f) => f.path))
+  for (const file of source) {
+    if (!existing.has(file.path)) {
+      target.push(file)
+      existing.add(file.path)
+    }
+  }
+}
+
 async function downloadRawDeps(
   client: IpmClient,
   depNames: string[],
@@ -174,6 +188,15 @@ export function registerIpcHandlers(): void {
   const settings = loadSettings()
   ipmClient = new IpmClient(settings)
 
+  ipcMain.handle('session:check', () => {
+    if (isSessionExpired()) {
+      clearTokens()
+      ipmClient.updateSettings(loadSettings())
+      return { expired: true }
+    }
+    return { expired: false }
+  })
+
   ipcMain.handle('settings:load', () => {
     return loadSettings()
   })
@@ -197,6 +220,7 @@ export function registerIpcHandlers(): void {
     }
     saveSettings(settings)
     ipmClient.updateSettings(settings)
+    touchActivity()
     enableMenuItems()
     return { success: true }
   })
@@ -204,6 +228,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('ipm:search-apps', async () => {
     try {
       const results = await ipmClient.searchApps()
+      touchActivity()
       for (const app of results) {
         app.availableVersions.sort(compareSemverDesc)
       }
@@ -367,16 +392,13 @@ export function registerIpcHandlers(): void {
           fromIsCustom && decompile ? decompileApp(cloneFiles(fromRawFiles), appName) : cloneFiles(fromRawFiles)
         const toFiles = toIsCustom && decompile ? decompileApp(cloneFiles(toRawFiles), appName) : cloneFiles(toRawFiles)
 
-        fromFiles.push(
-          ...applyDepsDecompile(fromAccDeps, 'account', fromIsCustom, decompile),
-          ...applyDepsDecompile(fromHookDeps, 'hook', fromIsCustom, decompile)
-        )
-        toFiles.push(
-          ...applyDepsDecompile(toAccDeps, 'account', toIsCustom, decompile),
-          ...applyDepsDecompile(toHookDeps, 'hook', toIsCustom, decompile)
-        )
+        pushNewFiles(fromFiles, applyDepsDecompile(fromAccDeps, 'account', fromIsCustom, decompile))
+        pushNewFiles(fromFiles, applyDepsDecompile(fromHookDeps, 'hook', fromIsCustom, decompile))
+        pushNewFiles(toFiles, applyDepsDecompile(toAccDeps, 'account', toIsCustom, decompile))
+        pushNewFiles(toFiles, applyDepsDecompile(toHookDeps, 'hook', toIsCustom, decompile))
 
         const diffResult = computeDiff('app', fromFiles, toFiles)
+        touchActivity()
         return {
           success: true,
           data: { ...diffResult, isCustomApp: fromIsCustom || toIsCustom }
@@ -425,12 +447,11 @@ export function registerIpcHandlers(): void {
 
       const files = isCustom && decompile ? decompileApp(cloneFiles(rawFiles), appName) : cloneFiles(rawFiles)
 
-      files.push(
-        ...applyDepsDecompile(accDeps, 'account', isCustom, decompile),
-        ...applyDepsDecompile(hookDeps, 'hook', isCustom, decompile)
-      )
+      pushNewFiles(files, applyDepsDecompile(accDeps, 'account', isCustom, decompile))
+      pushNewFiles(files, applyDepsDecompile(hookDeps, 'hook', isCustom, decompile))
 
       const diffResult = computeDiff('app', [], files)
+      touchActivity()
       return {
         success: true,
         data: { ...diffResult, isCustomApp: isCustom }
@@ -440,6 +461,54 @@ export function registerIpcHandlers(): void {
       return { success: false, error: message }
     }
   })
+
+  ipcMain.handle(
+    'editor:open-in-vscode',
+    async (_event, opts: { appName: string; version: string; files: { path: string; content: string }[] }) => {
+      try {
+        const tmpDir = path.join(tmpdir(), 'makediff', `${opts.appName}@${opts.version}`)
+        await fs.rm(tmpDir, { recursive: true, force: true })
+        await fs.mkdir(tmpDir, { recursive: true })
+
+        for (const file of opts.files) {
+          const filePath = path.join(tmpDir, file.path)
+          await fs.mkdir(path.dirname(filePath), { recursive: true })
+          await fs.writeFile(filePath, file.content, 'utf-8')
+        }
+
+        const codePaths =
+          process.platform === 'darwin'
+            ? [
+                '/usr/local/bin/code',
+                '/opt/homebrew/bin/code',
+                '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+              ]
+            : [
+                'code',
+                `${process.env.LOCALAPPDATA}\\Programs\\Microsoft VS Code\\bin\\code.cmd`,
+                'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd'
+              ]
+
+        return new Promise((resolve) => {
+          const tryNext = (i: number): void => {
+            if (i >= codePaths.length) {
+              resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
+              return
+            }
+            execFile(codePaths[i], [tmpDir], (err) => {
+              if (err && (err as NodeJS.ErrnoException).code === 'ENOENT') tryNext(i + 1)
+              else if (err) resolve({ success: false, error: err.message })
+              else resolve({ success: true })
+            })
+          }
+          tryNext(0)
+        })
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { success: false, error: message }
+      }
+    }
+  )
 
   ipcMain.handle('shell:show-in-finder', (_event, fullPath: string) => {
     shell.showItemInFolder(fullPath)
@@ -672,7 +741,9 @@ export function registerIpcHandlers(): void {
         downloadDepsForVersion(ipmClient, accounts, version, 'account', isCustom),
         downloadDepsForVersion(ipmClient, hooks, version, 'hook', isCustom)
       ])
-      const allFiles = [...appFiles, ...accFiles, ...hookFiles]
+      const allFiles = [...appFiles]
+      pushNewFiles(allFiles, accFiles)
+      pushNewFiles(allFiles, hookFiles)
 
       // Write all files to disk
       for (const file of allFiles) {

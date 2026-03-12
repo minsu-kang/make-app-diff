@@ -53,6 +53,9 @@ export function decompileHook(files: ExtractedFile[]): ExtractedFile[] {
 // Fields that go into separate files, not metadata.json
 const MODULE_SEPARATE_FIELDS = new Set(['parameters', 'interface', 'scope', 'expect'])
 
+// RPC types that belong to webhooks, not modules
+const HOOK_RPC_TYPES = new Set(['attach', 'detach', 'update'])
+
 interface ModuleDef {
   name: string
   type: string
@@ -227,17 +230,29 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
     result.push({ path: `${prefix}/samples.imljson`, content: '{}' })
   }
 
+  // Collect webhook names from instant_trigger modules
+  const webhookNames = new Set(modules.filter((m) => m.webhook).map((m) => m.webhook!))
+
   // Generate RPC files
   for (const [name, api] of Object.entries(rpcApis)) {
     // RPC names like "epoch:WatchBoardItemsV2" → modules/WatchBoardItemsV2/epoch.imljson
+    // Hook RPCs like "attach:hookName" → webhooks/hookName/attach.imljson
     if (name.includes(':')) {
       const colonIdx = name.indexOf(':')
       const fileBase = name.substring(0, colonIdx)
-      const moduleName = name.substring(colonIdx + 1)
+      const targetName = name.substring(colonIdx + 1)
       const cleaned = cleanApi(api, baseConfig)
 
-      // Remove fields identical to the module's api.imljson (deep)
-      const modApi = moduleCleanedApis[moduleName]
+      // Hook RPCs (attach/detach/update) go to webhooks/ directory
+      const isHookRpc = HOOK_RPC_TYPES.has(fileBase) && webhookNames.has(targetName)
+      if (isHookRpc) {
+        const content = transformRpcReferences(stringify(cleaned), appName)
+        result.push({ path: `webhooks/${targetName}/${fileBase}.imljson`, content })
+        continue
+      }
+
+      // Module RPCs (epoch, etc.) — remove fields identical to the module's api.imljson
+      const modApi = moduleCleanedApis[targetName]
       let epochData = cleaned
       if (modApi && isPlainObj(modApi) && isPlainObj(cleaned)) {
         epochData = removeCommonFields(cleaned, modApi)
@@ -258,7 +273,7 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
       }
 
       const content = transformRpcReferences(stringify(epochData), appName)
-      result.push({ path: `modules/${moduleName}/${fileBase}.imljson`, content })
+      result.push({ path: `modules/${targetName}/${fileBase}.imljson`, content })
       continue
     }
 
@@ -388,6 +403,7 @@ function doDecompileHook(files: ExtractedFile[]): ExtractedFile[] {
   }
 
   // attach.imljson, detach.imljson, update.imljson — default empty
+  // (app's rpc.js may override these via doDecompileApp into webhooks/{hookName}/)
   result.push(makeFile('attach.imljson', {}))
   result.push(makeFile('detach.imljson', {}))
   result.push(makeFile('update.imljson', {}))
