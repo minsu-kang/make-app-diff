@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.5.0](https://github.com/minsu-kang/make-app-diff/compare/v1.4.5...v1.5.0) (2026-03-12)
+
+
+### Features
+
+* add 48-hour session timeout for token security ([cb0e047](https://github.com/minsu-kang/make-app-diff/commit/cb0e04767f00c1a28a87642bcf8b241e3a5f2122))
+* add Open in VS Code button for show mode ([dbb7556](https://github.com/minsu-kang/make-app-diff/commit/dbb7556789fc4b7a30868b2cc939cdc0ddae54c3))
+
+
+### Bug Fixes
+
+* hook RPC routing and various improvements ([28dbf1b](https://github.com/minsu-kang/make-app-diff/commit/28dbf1badf44fc8ec79eda70fb4d84cd6a91a143))
+* prevent hook dep defaults from overwriting app rpc.js data ([ba64df8](https://github.com/minsu-kang/make-app-diff/commit/ba64df850d6f4b8fd476bf770d9d2ed986af115d))
+* quit app on macOS when all windows are closed ([5ba6aa3](https://github.com/minsu-kang/make-app-diff/commit/5ba6aa39ca9695935913ff1d9618742a36b2b902))
+* route hook RPCs (attach/detach/update) to webhooks/ directory ([8fa22e9](https://github.com/minsu-kang/make-app-diff/commit/8fa22e9466f3b3ce2bcf1d70f1cf5a7e233f0e6d))
+
 ## [1.4.5](https://github.com/minsu-kang/make-app-diff/compare/v1.4.4...v1.4.5) (2026-03-11)
 
 
