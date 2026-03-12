@@ -31,6 +31,17 @@ function assertString(value: unknown, name: string): asserts value is string {
   }
 }
 
+function compareSemverDesc(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0
+    const nb = pb[i] || 0
+    if (na !== nb) return nb - na
+  }
+  return 0
+}
+
 function assertNumber(value: unknown, name: string): asserts value is number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`Invalid ${name}: expected finite number`)
@@ -218,6 +229,9 @@ export function registerIpcHandlers(): void {
     try {
       const results = await ipmClient.searchApps()
       touchActivity()
+      for (const app of results) {
+        app.availableVersions.sort(compareSemverDesc)
+      }
       return { success: true, data: results }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
@@ -230,7 +244,9 @@ export function registerIpcHandlers(): void {
       assertString(appName, 'appName')
       if (version !== undefined) assertString(version, 'version')
       const info = await ipmClient.getAppInfo(appName)
-      const manifestVersion = version || info.version
+      info.versions.sort(compareSemverDesc)
+      const manifestVersion = version ?? info.versions[0] ?? info.version
+      info.version = manifestVersion
       const manifest = await ipmClient.getManifest(appName, manifestVersion)
       info.label = ((manifest as Record<string, unknown>).label as string) || appName
 

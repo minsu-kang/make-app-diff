@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.5](https://github.com/minsu-kang/make-app-diff/compare/v1.4.4...v1.4.5) (2026-03-11)
+
+
+### Bug Fixes
+
+* address review feedback on version handling edge cases ([69f8b72](https://github.com/minsu-kang/make-app-diff/commit/69f8b720e3e9ba6a3025492315ea9c1436e5e106))
+* sort versions by semver and use full version list from API ([e97ef62](https://github.com/minsu-kang/make-app-diff/commit/e97ef6269bc1a38b4a56363c51b94a808a3227f1))
+* sort versions by semver and use full version list from API ([672390e](https://github.com/minsu-kang/make-app-diff/commit/672390e4981dbbbc9f6c4153e5cef278d74f6ec4))
+
 ## [1.4.4](https://github.com/minsu-kang/make-app-diff/compare/v1.4.3...v1.4.4) (2026-03-10)
 
 
