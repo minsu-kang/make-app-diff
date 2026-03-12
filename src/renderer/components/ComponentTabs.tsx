@@ -51,11 +51,7 @@ export default function ComponentTabs({
         )
       })}
       {onOpenVscode && (
-        <button
-          className="btn-decompile-toggle"
-          onClick={onOpenVscode}
-          title="Open in VS Code"
-        >
+        <button className="btn-decompile-toggle" onClick={onOpenVscode} title="Open in VS Code">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path
               d="M10.5 1.5L14 3.5v9l-3.5 2L2 9l2-1.5M10.5 1.5L6 5.5M10.5 1.5v11.5M2 9l4-3.5M2 9l4.5 2.5L10.5 13M6 5.5l4.5 2v5.5"

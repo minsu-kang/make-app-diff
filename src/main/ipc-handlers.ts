@@ -113,6 +113,17 @@ function cloneFiles(files: ExtractedFile[]): ExtractedFile[] {
   return files.map((f) => ({ path: f.path, content: f.content }))
 }
 
+/** Push files into target, skipping paths that already exist (app rpc.js data wins over hook defaults) */
+function pushNewFiles(target: ExtractedFile[], source: ExtractedFile[]): void {
+  const existing = new Set(target.map((f) => f.path))
+  for (const file of source) {
+    if (!existing.has(file.path)) {
+      target.push(file)
+      existing.add(file.path)
+    }
+  }
+}
+
 async function downloadRawDeps(
   client: IpmClient,
   depNames: string[],
@@ -365,14 +376,10 @@ export function registerIpcHandlers(): void {
           fromIsCustom && decompile ? decompileApp(cloneFiles(fromRawFiles), appName) : cloneFiles(fromRawFiles)
         const toFiles = toIsCustom && decompile ? decompileApp(cloneFiles(toRawFiles), appName) : cloneFiles(toRawFiles)
 
-        fromFiles.push(
-          ...applyDepsDecompile(fromAccDeps, 'account', fromIsCustom, decompile),
-          ...applyDepsDecompile(fromHookDeps, 'hook', fromIsCustom, decompile)
-        )
-        toFiles.push(
-          ...applyDepsDecompile(toAccDeps, 'account', toIsCustom, decompile),
-          ...applyDepsDecompile(toHookDeps, 'hook', toIsCustom, decompile)
-        )
+        pushNewFiles(fromFiles, applyDepsDecompile(fromAccDeps, 'account', fromIsCustom, decompile))
+        pushNewFiles(fromFiles, applyDepsDecompile(fromHookDeps, 'hook', fromIsCustom, decompile))
+        pushNewFiles(toFiles, applyDepsDecompile(toAccDeps, 'account', toIsCustom, decompile))
+        pushNewFiles(toFiles, applyDepsDecompile(toHookDeps, 'hook', toIsCustom, decompile))
 
         const diffResult = computeDiff('app', fromFiles, toFiles)
         touchActivity()
@@ -424,10 +431,8 @@ export function registerIpcHandlers(): void {
 
       const files = isCustom && decompile ? decompileApp(cloneFiles(rawFiles), appName) : cloneFiles(rawFiles)
 
-      files.push(
-        ...applyDepsDecompile(accDeps, 'account', isCustom, decompile),
-        ...applyDepsDecompile(hookDeps, 'hook', isCustom, decompile)
-      )
+      pushNewFiles(files, applyDepsDecompile(accDeps, 'account', isCustom, decompile))
+      pushNewFiles(files, applyDepsDecompile(hookDeps, 'hook', isCustom, decompile))
 
       const diffResult = computeDiff('app', [], files)
       touchActivity()
@@ -720,7 +725,9 @@ export function registerIpcHandlers(): void {
         downloadDepsForVersion(ipmClient, accounts, version, 'account', isCustom),
         downloadDepsForVersion(ipmClient, hooks, version, 'hook', isCustom)
       ])
-      const allFiles = [...appFiles, ...accFiles, ...hookFiles]
+      const allFiles = [...appFiles]
+      pushNewFiles(allFiles, accFiles)
+      pushNewFiles(allFiles, hookFiles)
 
       // Write all files to disk
       for (const file of allFiles) {

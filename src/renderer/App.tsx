@@ -91,14 +91,17 @@ export default function App() {
     })
 
     // Periodic session check (every 30 minutes)
-    const sessionInterval = setInterval(async () => {
-      const { expired } = await window.api.session.check()
-      if (expired) {
-        showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
-        setForcedSettings(true)
-        setShowSettings(true)
-      }
-    }, 30 * 60 * 1000)
+    const sessionInterval = setInterval(
+      async () => {
+        const { expired } = await window.api.session.check()
+        if (expired) {
+          showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
+          setForcedSettings(true)
+          setShowSettings(true)
+        }
+      },
+      30 * 60 * 1000
+    )
 
     return () => {
       clearInterval(sessionInterval)
