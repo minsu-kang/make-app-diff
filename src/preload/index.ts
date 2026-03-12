@@ -38,7 +38,12 @@ const api = {
       toVersion: string
       oldContent: string
       newContent: string
-    }): Promise<IpcResult<void>> => ipcRenderer.invoke('editor:open-diff', opts)
+    }): Promise<IpcResult<void>> => ipcRenderer.invoke('editor:open-diff', opts),
+    openInVscode: (opts: {
+      appName: string
+      version: string
+      files: { path: string; content: string }[]
+    }): Promise<IpcResult<void>> => ipcRenderer.invoke('editor:open-in-vscode', opts)
   },
   clipboard: {
     copyZip: (opts: {

@@ -425,6 +425,54 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle(
+    'editor:open-in-vscode',
+    async (_event, opts: { appName: string; version: string; files: { path: string; content: string }[] }) => {
+      try {
+        const tmpDir = path.join(tmpdir(), 'makediff', `${opts.appName}@${opts.version}`)
+        await fs.rm(tmpDir, { recursive: true, force: true })
+        await fs.mkdir(tmpDir, { recursive: true })
+
+        for (const file of opts.files) {
+          const filePath = path.join(tmpDir, file.path)
+          await fs.mkdir(path.dirname(filePath), { recursive: true })
+          await fs.writeFile(filePath, file.content, 'utf-8')
+        }
+
+        const codePaths =
+          process.platform === 'darwin'
+            ? [
+                '/usr/local/bin/code',
+                '/opt/homebrew/bin/code',
+                '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
+              ]
+            : [
+                'code',
+                `${process.env.LOCALAPPDATA}\\Programs\\Microsoft VS Code\\bin\\code.cmd`,
+                'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd'
+              ]
+
+        return new Promise((resolve) => {
+          const tryNext = (i: number): void => {
+            if (i >= codePaths.length) {
+              resolve({ success: false, error: 'VS Code not found. Install "code" CLI command.' })
+              return
+            }
+            execFile(codePaths[i], [tmpDir], (err) => {
+              if (err && (err as NodeJS.ErrnoException).code === 'ENOENT') tryNext(i + 1)
+              else if (err) resolve({ success: false, error: err.message })
+              else resolve({ success: true })
+            })
+          }
+          tryNext(0)
+        })
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { success: false, error: message }
+      }
+    }
+  )
+
   ipcMain.handle('shell:show-in-finder', (_event, fullPath: string) => {
     shell.showItemInFolder(fullPath)
   })

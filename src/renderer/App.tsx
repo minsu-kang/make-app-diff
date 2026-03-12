@@ -193,6 +193,21 @@ export default function App() {
     if (toVersion) handleShow(toVersion, newDecompile)
   }, [decompile, toVersion, handleShow])
 
+  const handleOpenVscode = useCallback(async () => {
+    if (!appInfo || !diffResult || !toVersion) return
+    const files = diffResult.diffs
+      .filter((d) => d.newContent)
+      .map((d) => ({ path: d.filePath, content: d.newContent! }))
+    const result = await window.api.editor.openInVscode({
+      appName: appInfo.name,
+      version: toVersion,
+      files
+    })
+    if (!result.success) {
+      showToast(result.error || 'Failed to open VS Code', 'error')
+    }
+  }, [appInfo, diffResult, toVersion])
+
   const currentDiffs = useMemo(() => {
     if (!diffResult) return []
     return filterDiffs(diffResult.diffs, activeTab)
@@ -425,6 +440,7 @@ export default function App() {
                   isCustomApp={viewMode === 'show' ? diffResult?.isCustomApp : undefined}
                   decompile={decompile}
                   onDecompileToggle={handleDecompileToggle}
+                  onOpenVscode={viewMode === 'show' ? handleOpenVscode : undefined}
                 />
 
                 <div className="diff-layout">
