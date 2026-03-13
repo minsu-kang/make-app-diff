@@ -101,6 +101,14 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 6. **If custom app**: decompile accounts → `connections/`, hooks → `webhooks/`
 7. Filter out `lib/functions.js` from dependencies
 8. Compute full-context unified diff across all files
+9. Normalize JSON/IMLJSON keys via schema-aware sorting (`IMLJSON_KEY_ORDER` in `diff-service.ts`)
+
+### Diff Service (`diff-service.ts`)
+- `computeDiff()` normalizes all `.json` and `.imljson` files before diffing
+- `.imljson` files: keys sorted by `IMLJSON_KEY_ORDER` schema (e.g., `baseUrl` → `url` → `method` → `headers` → `qs` → `body` → `response` → `pagination` → `log`)
+- `.json` files: keys sorted alphabetically
+- Nested objects (`response`, `pagination`, `log`, `aws`, `repeat`) have their own child key orders
+- Keys not in the schema fall back to alphabetical sort after known keys
 
 ### Custom App Decompiler (`decompiler.ts`)
 Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
@@ -123,9 +131,10 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - `iml` field stripped from all extracted API objects
 - `metadata` field stripped from module/RPC APIs (but kept in connections)
 - `communication` arrays unwrapped: `{communication: [...]}` → `[...]`
-- Base fields (`baseUrl`, `headers`, `timeout`, `log`, `response.error`, common `temp`) extracted to `base.imljson` and removed from each module/RPC
-- Base extraction scans ALL modules including inside `communication[0]` blocks
-- Common `temp` sub-fields: only fields with identical values across ALL modules go to base
+- Base fields (`baseUrl`, `headers`, `timeout`, `log`, `response.error`, common `temp`, common `response.temp`) extracted to `base.imljson` and removed from each module/RPC
+- Base extraction uses frequency-based approach: scans ALL communication steps (not just `[0]`) across ALL modules, picks the most common value that appears in 2+ modules
+- Module-specific overrides preserved: if a module's field value differs from base, it stays in the module
+- Common `temp` / `response.temp` sub-fields: only sub-fields with identical values across ALL modules go to base; module-specific sub-fields stay in each module
 - RPC references transformed: `rpc://{appName}@{N}/` → `rpc://`
 - Module types from manifest sections: actions→action, searches→search, triggers→trigger
 - `__IMTCONN__` param → connection reference, `__IMTHOOK__` param → webhook + instant_trigger

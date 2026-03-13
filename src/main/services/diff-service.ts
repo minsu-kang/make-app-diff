@@ -9,6 +9,7 @@ interface KeyOrder {
 
 const IMLJSON_KEY_ORDER: KeyOrder = {
   keys: [
+    'baseUrl',
     'temp',
     'condition',
     'url',
@@ -19,7 +20,11 @@ const IMLJSON_KEY_ORDER: KeyOrder = {
     'body',
     'type',
     'ca',
+    'encoding',
     'gzip',
+    'followRedirects',
+    'followAllRedirects',
+    'timeout',
     'aws',
     'response',
     'pagination',
@@ -31,7 +36,7 @@ const IMLJSON_KEY_ORDER: KeyOrder = {
       keys: ['key', 'secret', 'session', 'bucket', 'sign_version']
     },
     response: {
-      keys: ['temp', 'valid', 'type', 'iterate', 'trigger', 'output', 'wrapper', 'error'],
+      keys: ['temp', 'valid', 'type', 'iterate', 'trigger', 'output', 'limit', 'wrapper', 'error'],
       children: {
         iterate: { keys: ['container', 'condition'] },
         trigger: { keys: ['id', 'date', 'type', 'order'] },
@@ -39,7 +44,7 @@ const IMLJSON_KEY_ORDER: KeyOrder = {
       }
     },
     pagination: {
-      keys: ['mergeWithParent', 'url', 'method', 'headers', 'qs', 'body', 'condition']
+      keys: ['mergeWithParent', 'url', 'method', 'headers', 'qs', 'body', 'condition', 'rl']
     },
     log: { keys: ['sanitize'] },
     repeat: { keys: ['condition', 'delay', 'limit'] }
