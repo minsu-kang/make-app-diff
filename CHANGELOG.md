@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1](https://github.com/minsu-kang/make-app-diff/compare/v1.5.0...v1.5.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* decompiler base extraction and field ordering bugs ([5e51b56](https://github.com/minsu-kang/make-app-diff/commit/5e51b565a29aafd3f7dae267f31e320832bb9574))
+* decompiler base extraction and field ordering bugs ([ed83d60](https://github.com/minsu-kang/make-app-diff/commit/ed83d60b5fff76c2e4de1d5f8e84b1fb4616a944))
+
 ## [1.5.0](https://github.com/minsu-kang/make-app-diff/compare/v1.4.5...v1.5.0) (2026-03-12)
 
 
