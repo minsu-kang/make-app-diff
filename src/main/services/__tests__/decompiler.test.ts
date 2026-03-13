@@ -435,6 +435,192 @@ describe('decompileApp', () => {
     const sorted = [...paths].sort()
     expect(paths).toEqual(sorted)
   })
+
+  it('preserves module-specific headers/log that differ from base', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'a1', parameters: [] },
+        { name: 'a2', parameters: [] }
+      ]
+    }
+    const appJs = `
+      const rt = require('app-runtime');
+      class A1 extends rt.ExecuteAction {
+        constructor() {
+          super();
+          this.api = {
+            baseUrl: 'https://api.example.com',
+            url: '/a1',
+            headers: { Authorization: 'Bearer {{connection.accessToken}}' },
+            log: { sanitize: ['request.headers.authorization'] }
+          };
+        }
+      }
+      class A2 extends rt.ExecuteAction {
+        constructor() {
+          super();
+          this.api = {
+            baseUrl: 'https://api.example.com',
+            url: '/a2',
+            headers: { Authorization: 'Bearer {{connection.accessToken}}', 'X-Custom': 'val' },
+            log: { sanitize: ['request.headers.authorization', 'response.body'] }
+          };
+        }
+      }
+      module.exports = { a1: A1, a2: A2 };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    // headers and log differ across modules, so they should NOT be in base
+    expect(base.headers).toBeUndefined()
+    expect(base.log).toBeUndefined()
+    // baseUrl is identical, so it goes to base
+    expect(base.baseUrl).toBe('https://api.example.com')
+
+    // Module APIs should preserve their own headers and log
+    const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
+    expect(a1Api.headers).toEqual({ Authorization: 'Bearer {{connection.accessToken}}' })
+    expect(a1Api.log).toEqual({ sanitize: ['request.headers.authorization'] })
+
+    const a2Api = parseFile(result, 'modules/a2/api.imljson') as Record<string, unknown>
+    expect(a2Api.headers).toEqual({
+      Authorization: 'Bearer {{connection.accessToken}}',
+      'X-Custom': 'val'
+    })
+    expect(a2Api.log).toEqual({
+      sanitize: ['request.headers.authorization', 'response.body']
+    })
+  })
+
+  it('extracts response.temp.errorMessages to base when common across modules', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'a1', parameters: [] },
+        { name: 'a2', parameters: [] }
+      ]
+    }
+    const errorMessages = {
+      '190': 'Invalid OAuth token',
+      '200': 'Permissions error'
+    }
+    const appJs = `
+      const rt = require('app-runtime');
+      class A1 extends rt.ExecuteAction {
+        constructor() {
+          super();
+          this.api = {
+            url: '/a1',
+            response: {
+              temp: { errorMessages: ${JSON.stringify(errorMessages)}, uniqueA1: 'x' },
+              output: '{{body}}'
+            }
+          };
+        }
+      }
+      class A2 extends rt.ExecuteAction {
+        constructor() {
+          super();
+          this.api = {
+            url: '/a2',
+            response: {
+              temp: { errorMessages: ${JSON.stringify(errorMessages)}, uniqueA2: 'y' },
+              output: '{{body}}'
+            }
+          };
+        }
+      }
+      module.exports = { a1: A1, a2: A2 };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    const baseResponse = base.response as Record<string, unknown>
+    expect(baseResponse).toBeDefined()
+    const baseResponseTemp = baseResponse.temp as Record<string, unknown>
+    expect(baseResponseTemp).toBeDefined()
+    expect(baseResponseTemp.errorMessages).toEqual(errorMessages)
+
+    // Module APIs should NOT have errorMessages in response.temp (it's in base)
+    // but should keep module-specific response.temp fields
+    const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
+    const a1Response = a1Api.response as Record<string, unknown>
+    expect(a1Response).toBeDefined()
+    const a1Temp = a1Response.temp as Record<string, unknown>
+    expect(a1Temp.uniqueA1).toBe('x')
+    expect(a1Temp.errorMessages).toBeUndefined()
+
+    const a2Api = parseFile(result, 'modules/a2/api.imljson') as Record<string, unknown>
+    const a2Response = a2Api.response as Record<string, unknown>
+    const a2Temp = a2Response.temp as Record<string, unknown>
+    expect(a2Temp.uniqueA2).toBe('y')
+    expect(a2Temp.errorMessages).toBeUndefined()
+  })
+
+  it('only extracts base headers when identical across all modules', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'a1', parameters: [] },
+        { name: 'a2', parameters: [] },
+        { name: 'a3', parameters: [] }
+      ]
+    }
+    const appJs = `
+      const rt = require('app-runtime');
+      class A1 extends rt.ExecuteAction {
+        constructor() {
+          super();
+          this.api = {
+            url: '/a1',
+            headers: { Authorization: 'Bearer {{connection.accessToken}}' }
+          };
+        }
+      }
+      class A2 extends rt.ExecuteAction {
+        constructor() {
+          super();
+          this.api = {
+            url: '/a2',
+            headers: { Authorization: 'Bearer {{connection.accessToken}}' }
+          };
+        }
+      }
+      class A3 extends rt.ExecuteAction {
+        constructor() {
+          super();
+          this.api = {
+            url: '/a3',
+            headers: { Authorization: 'Bearer {{connection.accessToken}}' }
+          };
+        }
+      }
+      module.exports = { a1: A1, a2: A2, a3: A3 };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    // All modules have identical headers, so it should be in base
+    expect(base.headers).toEqual({ Authorization: 'Bearer {{connection.accessToken}}' })
+
+    // Modules should not have headers since they match base
+    const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
+    expect(a1Api.headers).toBeUndefined()
+  })
 })
 
 // ---- decompileAccount ----

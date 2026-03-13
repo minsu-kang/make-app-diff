@@ -547,59 +547,100 @@ function parseFunctions(code: string): Record<string, string> {
 
 /**
  * Scan all module APIs to find base fields.
- * Checks top-level fields first, then falls back to communication[0] blocks
- * for apps that use the communication pattern (e.g., Google Drive).
+ * For top-level fields: uses frequency-based approach across ALL communication steps.
+ * For response.error / response.temp / temp: requires identical values across ALL modules.
  */
 function extractBaseFromAll(apis: Record<string, unknown>[]): Record<string, unknown> {
   const base: Record<string, unknown> = {}
 
-  // For each base field, find it in any module's API (top-level or communication[0])
+  // For each base field, find the most common value across all modules and communication steps.
+  // A value qualifies as "base" if it appears in 2+ modules.
   for (const field of BASE_TOP_FIELDS) {
+    // Collect all values per module (a module may have multiple comm steps)
+    const moduleValues: string[][] = []
+
     for (const api of apis) {
+      const vals: string[] = []
       if (api[field] !== undefined) {
-        base[field] = api[field]
-        break
+        vals.push(JSON.stringify(api[field]))
+      } else {
+        // Check inside ALL communication steps (not just [0])
+        const comm = api.communication as Record<string, unknown>[] | undefined
+        if (Array.isArray(comm)) {
+          for (const step of comm) {
+            if (step[field] !== undefined) {
+              vals.push(JSON.stringify(step[field]))
+            }
+          }
+        }
       }
-      // Check inside communication[0]
-      const comm = api.communication as Record<string, unknown>[] | undefined
-      if (Array.isArray(comm) && comm.length > 0 && comm[0][field] !== undefined) {
-        base[field] = comm[0][field]
-        break
+      if (vals.length > 0) moduleValues.push(vals)
+    }
+
+    if (moduleValues.length < 2) continue
+
+    // Find the most frequent value across all steps of all modules
+    const freq = new Map<string, number>()
+    for (const vals of moduleValues) {
+      // Count unique values per module (each module votes once per unique value)
+      const unique = new Set(vals)
+      for (const v of unique) {
+        freq.set(v, (freq.get(v) || 0) + 1)
       }
+    }
+
+    // Pick the value present in the most modules (must be 2+)
+    let bestVal = ''
+    let bestCount = 0
+    for (const [v, count] of freq) {
+      if (count > bestCount) {
+        bestVal = v
+        bestCount = count
+      }
+    }
+
+    if (bestCount >= 2) {
+      base[field] = JSON.parse(bestVal)
     }
   }
 
-  // Extract response.error — check top-level response, then communication[0].response
-  for (const api of apis) {
-    const response = api.response as Record<string, unknown> | undefined
-    if (response) {
-      const baseResponse: Record<string, unknown> = {}
-      for (const field of BASE_RESPONSE_FIELDS) {
+  // Extract response.error — only if identical across ALL modules that have it
+  // Scans all communication steps, uses frequency-based approach like top-level fields
+  for (const field of BASE_RESPONSE_FIELDS) {
+    const moduleValues: string[][] = []
+    for (const api of apis) {
+      const responses = getAllResponseObjs(api)
+      const vals: string[] = []
+      for (const response of responses) {
         if (response[field] !== undefined) {
-          baseResponse[field] = response[field]
+          vals.push(JSON.stringify(response[field]))
         }
       }
-      if (Object.keys(baseResponse).length > 0) {
-        base.response = baseResponse
-        break
+      if (vals.length > 0) moduleValues.push(vals)
+    }
+
+    if (moduleValues.length < 2) continue
+
+    const freq = new Map<string, number>()
+    for (const vals of moduleValues) {
+      const unique = new Set(vals)
+      for (const v of unique) {
+        freq.set(v, (freq.get(v) || 0) + 1)
       }
     }
-    // Check inside communication[0].response
-    const comm = api.communication as Record<string, unknown>[] | undefined
-    if (Array.isArray(comm) && comm.length > 0) {
-      const commResponse = comm[0].response as Record<string, unknown> | undefined
-      if (commResponse) {
-        const baseResponse: Record<string, unknown> = {}
-        for (const field of BASE_RESPONSE_FIELDS) {
-          if (commResponse[field] !== undefined) {
-            baseResponse[field] = commResponse[field]
-          }
-        }
-        if (Object.keys(baseResponse).length > 0) {
-          base.response = baseResponse
-          break
-        }
+
+    let bestVal = ''
+    let bestCount = 0
+    for (const [v, count] of freq) {
+      if (count > bestCount) {
+        bestVal = v
+        bestCount = count
       }
+    }
+
+    if (bestCount >= 2) {
+      if (!base.response) base.response = {}
+      ;(base.response as Record<string, unknown>)[field] = JSON.parse(bestVal)
     }
   }
 
@@ -609,15 +650,79 @@ function extractBaseFromAll(apis: Record<string, unknown>[]): Record<string, unk
     base.temp = baseTemp
   }
 
+  // Extract common response.temp sub-fields across all modules
+  const baseResponseTemp = extractCommonResponseTemp(apis)
+  if (Object.keys(baseResponseTemp).length > 0) {
+    if (!base.response) base.response = {}
+    ;(base.response as Record<string, unknown>).temp = baseResponseTemp
+  }
+
   return base
 }
 
 /**
+ * Get all response objects from an API (top-level or from ALL communication steps).
+ */
+function getAllResponseObjs(api: Record<string, unknown>): Record<string, unknown>[] {
+  const response = api.response as Record<string, unknown> | undefined
+  if (response) return [response]
+  const comm = api.communication as Record<string, unknown>[] | undefined
+  if (Array.isArray(comm)) {
+    const results: Record<string, unknown>[] = []
+    for (const step of comm) {
+      const stepResponse = step.response as Record<string, unknown> | undefined
+      if (stepResponse) results.push(stepResponse)
+    }
+    return results
+  }
+  return []
+}
+
+/**
+ * Find response.temp sub-fields that are common (identical value) across ALL modules.
+ * Scans ALL communication steps (not just [0]). Checks all keys across all temps.
+ */
+function extractCommonResponseTemp(apis: Record<string, unknown>[]): Record<string, unknown> {
+  const temps: Record<string, unknown>[] = []
+  for (const api of apis) {
+    const responses = getAllResponseObjs(api)
+    for (const response of responses) {
+      const temp = response.temp as Record<string, unknown> | undefined
+      if (temp && typeof temp === 'object') {
+        temps.push(temp)
+      }
+    }
+  }
+
+  if (temps.length < 2) return {}
+
+  // Collect ALL keys from all temps (not just the first)
+  const allKeys = new Set<string>()
+  for (const temp of temps) {
+    for (const key of Object.keys(temp)) {
+      allKeys.add(key)
+    }
+  }
+
+  const common: Record<string, unknown> = {}
+  for (const key of allKeys) {
+    const firstVal = temps.find((t) => t[key] !== undefined)
+    if (!firstVal) continue
+    const serialized = JSON.stringify(firstVal[key])
+    const isCommon = temps.every((t) => t[key] !== undefined && JSON.stringify(t[key]) === serialized)
+    if (isCommon) {
+      common[key] = firstVal[key]
+    }
+  }
+
+  return common
+}
+
+/**
  * Find temp sub-fields that are common (identical value) across ALL modules that have temp.
- * These go into base.imljson; module-specific sub-fields stay in each module's api.imljson.
+ * Scans ALL communication steps. Checks all keys across all temps.
  */
 function extractCommonTemp(apis: Record<string, unknown>[]): Record<string, unknown> {
-  // Collect all temp objects (from top-level or communication[0])
   const temps: Record<string, unknown>[] = []
   for (const api of apis) {
     const temp = api.temp as Record<string, unknown> | undefined
@@ -626,24 +731,34 @@ function extractCommonTemp(apis: Record<string, unknown>[]): Record<string, unkn
       continue
     }
     const comm = api.communication as Record<string, unknown>[] | undefined
-    if (Array.isArray(comm) && comm.length > 0) {
-      const commTemp = comm[0].temp as Record<string, unknown> | undefined
-      if (commTemp && typeof commTemp === 'object') {
-        temps.push(commTemp)
+    if (Array.isArray(comm)) {
+      for (const step of comm) {
+        const commTemp = step.temp as Record<string, unknown> | undefined
+        if (commTemp && typeof commTemp === 'object') {
+          temps.push(commTemp)
+        }
       }
     }
   }
 
   if (temps.length < 2) return {}
 
-  // Find sub-fields present in ALL temp objects with identical JSON values
-  const firstTemp = temps[0]
+  // Collect ALL keys from all temps (not just the first)
+  const allKeys = new Set<string>()
+  for (const temp of temps) {
+    for (const key of Object.keys(temp)) {
+      allKeys.add(key)
+    }
+  }
+
   const common: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(firstTemp)) {
-    const serialized = JSON.stringify(value)
+  for (const key of allKeys) {
+    const firstVal = temps.find((t) => t[key] !== undefined)
+    if (!firstVal) continue
+    const serialized = JSON.stringify(firstVal[key])
     const isCommon = temps.every((t) => t[key] !== undefined && JSON.stringify(t[key]) === serialized)
     if (isCommon) {
-      common[key] = value
+      common[key] = firstVal[key]
     }
   }
 
@@ -681,15 +796,44 @@ function cleanApi(raw: unknown, baseConfig: Record<string, unknown>): unknown {
 function removeBaseFields(api: Record<string, unknown>, baseConfig: Record<string, unknown>): Record<string, unknown> {
   const result = { ...api }
 
+  // Only remove top-level base fields if their value matches the base value
   for (const field of BASE_TOP_FIELDS) {
-    delete result[field]
+    if (baseConfig[field] !== undefined && result[field] !== undefined) {
+      if (JSON.stringify(result[field]) === JSON.stringify(baseConfig[field])) {
+        delete result[field]
+      }
+      // If values differ, keep the module-specific value
+    }
   }
 
+  // Handle response: remove base response fields and common response.temp sub-fields
   const response = result.response as Record<string, unknown> | undefined
-  if (response) {
+  const baseResponse = baseConfig.response as Record<string, unknown> | undefined
+  if (response && baseResponse) {
     const moduleResponse: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(response)) {
-      if (!BASE_RESPONSE_FIELDS.includes(key)) {
+      if (key === 'temp') {
+        // Remove common response.temp sub-fields, keep module-specific ones
+        const baseResponseTemp = baseResponse.temp as Record<string, unknown> | undefined
+        if (baseResponseTemp && typeof value === 'object' && value !== null) {
+          const moduleTemp: Record<string, unknown> = {}
+          for (const [tKey, tValue] of Object.entries(value as Record<string, unknown>)) {
+            if (!(tKey in baseResponseTemp) || JSON.stringify(tValue) !== JSON.stringify(baseResponseTemp[tKey])) {
+              moduleTemp[tKey] = tValue
+            }
+          }
+          if (Object.keys(moduleTemp).length > 0) {
+            moduleResponse.temp = moduleTemp
+          }
+        } else {
+          moduleResponse[key] = value
+        }
+      } else if (BASE_RESPONSE_FIELDS.includes(key) && baseResponse[key] !== undefined) {
+        // Remove base response fields (e.g. error) only if they match base
+        if (JSON.stringify(value) !== JSON.stringify(baseResponse[key])) {
+          moduleResponse[key] = value
+        }
+      } else {
         moduleResponse[key] = value
       }
     }
@@ -707,7 +851,7 @@ function removeBaseFields(api: Record<string, unknown>, baseConfig: Record<strin
     if (temp && typeof temp === 'object') {
       const moduleTemp: Record<string, unknown> = {}
       for (const [key, value] of Object.entries(temp)) {
-        if (!(key in baseTemp)) {
+        if (!(key in baseTemp) || JSON.stringify(value) !== JSON.stringify(baseTemp[key])) {
           moduleTemp[key] = value
         }
       }
