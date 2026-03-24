@@ -33,6 +33,9 @@ const api = {
   session: {
     check: (): Promise<{ expired: boolean }> => ipcRenderer.invoke('session:check')
   },
+  menu: {
+    setEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke('menu:set-enabled', enabled)
+  },
   showInFinder: (fullPath: string): Promise<void> => ipcRenderer.invoke('shell:show-in-finder', fullPath),
   editor: {
     openDiff: (opts: {

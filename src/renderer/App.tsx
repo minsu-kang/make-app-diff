@@ -86,6 +86,9 @@ export default function App() {
         if (!token || !token.trim()) {
           setForcedSettings(true)
           setShowSettings(true)
+        } else {
+          // Tokens exist and session is valid — enable menu items
+          window.api.menu.setEnabled(true)
         }
       })
     })
@@ -96,6 +99,7 @@ export default function App() {
         const { expired } = await window.api.session.check()
         if (expired) {
           showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
+          window.api.menu.setEnabled(false)
           setForcedSettings(true)
           setShowSettings(true)
         }
