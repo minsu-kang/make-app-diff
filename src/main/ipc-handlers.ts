@@ -5,7 +5,7 @@ import * as path from 'path'
 import { tmpdir } from 'os'
 import { execFile } from 'child_process'
 import archiver from 'archiver'
-import { enableMenuItems } from './index'
+import { enableMenuItems, disableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
 import { extractPkr } from './services/pkr-extractor'
 import { computeDiff } from './services/diff-service'
@@ -192,9 +192,18 @@ export function registerIpcHandlers(): void {
     if (isSessionExpired()) {
       clearTokens()
       ipmClient.updateSettings(loadSettings())
+      disableMenuItems()
       return { expired: true }
     }
     return { expired: false }
+  })
+
+  ipcMain.handle('menu:set-enabled', (_event, enabled: boolean) => {
+    if (enabled) {
+      enableMenuItems()
+    } else {
+      disableMenuItems()
+    }
   })
 
   ipcMain.handle('settings:load', () => {

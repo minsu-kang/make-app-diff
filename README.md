@@ -22,10 +22,8 @@ Built with Electron + React + TypeScript for macOS and Windows.
 ### Homebrew (macOS, recommended)
 
 ```bash
-brew install --cask --no-quarantine minsu-kang/makediff/makediff
+brew install --cask minsu-kang/makediff/makediff && xattr -cr /Applications/MakeDiff.app
 ```
-
-The `--no-quarantine` flag skips Gatekeeper checks, allowing the unsigned app to launch without the `xattr -cr` workaround.
 
 To update to the latest version:
 
