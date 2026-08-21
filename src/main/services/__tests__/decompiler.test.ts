@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { isCustomApp, decompileApp, decompileAccount, decompileHook } from '../decompiler'
+import { parseCompiledJs } from '../decompiler-sandbox'
 import { ExtractedFile } from '../../types'
 
 // Helper to find a file from result by path
@@ -171,15 +172,19 @@ describe('decompileApp', () => {
     expect(params).toEqual([{ name: 'param1', type: 'text' }])
   })
 
-  it('parses lib/app.js via VM and generates module api.imljson', () => {
+  it('parses lib/app.js (real const api = <literal> + Object.defineProperty idiom) into module api.imljson', () => {
     const manifest = {
       name: 'app',
       actions: [{ name: 'myAction', parameters: [] }]
     }
     const appJs = `
-      const runtime = require('app-runtime');
-      class MyAction extends runtime.ExecuteAction {
-        constructor() { super(); this.api = { url: '/test', method: 'GET' }; }
+      class MyAction extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/test', method: 'GET' };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
       module.exports = { myAction: MyAction };
     `
@@ -194,6 +199,99 @@ describe('decompileApp', () => {
     expect(api.method).toBe('GET')
   })
 
+  it('reads api from the legacy this.api = <literal> assignment shape (defensive path, real compiler never emits it)', () => {
+    const manifest = {
+      name: 'app',
+      actions: [{ name: 'act', parameters: [] }]
+    }
+    const appJs = `
+      class Act extends ExecuteAction {
+        constructor() {
+          super();
+          this.api = { url: '/legacy', method: 'GET' };
+        }
+      }
+      module.exports = { act: Act };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const api = parseFile(result, 'modules/act/api.imljson') as Record<string, unknown>
+    expect(api.url).toBe('/legacy')
+    expect(api.method).toBe('GET')
+  })
+
+  it('resolves the const api = null shape (real production shape, e.g. slack ExecuteHookTrigger classes) to an empty api.imljson', () => {
+    const manifest = {
+      name: 'app',
+      actions: [{ name: 'watchInteractivityEvents', parameters: [] }]
+    }
+    const appJs = `
+      class watchInteractivityEvents extends ExecuteHookTrigger {
+        constructor() {
+          super();
+          const api = null;
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { watchInteractivityEvents };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const api = parseFile(result, 'modules/watchInteractivityEvents/api.imljson')
+    expect(api).toEqual({})
+  })
+
+  it('falls back to raw compiled files, synchronously and without throwing, when app.js contains a non-static construct', () => {
+    const manifest = {
+      name: 'app',
+      actions: [{ name: 'act', parameters: [] }]
+    }
+    const appJs = `
+      class Act extends ExecuteAction {
+        constructor() {
+          super();
+          const api = buildApi();
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { act: Act };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+
+    const result = decompileApp(files, 'app')
+
+    // buildApi() isn't statically resolvable, so the whole file bails to the raw
+    // compiled input rather than a partially-decompiled SDK structure
+    expect(result).toEqual(files)
+    expect(findFile(result, 'modules/act/api.imljson')).toBeUndefined()
+  })
+
+  it('parseCompiledJs throws on the same non-static construct', () => {
+    const appJs = `
+      class Act extends ExecuteAction {
+        constructor() {
+          super();
+          const api = buildApi();
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { act: Act };
+    `
+    expect(() => parseCompiledJs(appJs)).toThrow()
+  })
+
   it('extracts base fields from module APIs into base.imljson', () => {
     const manifest = {
       name: 'app',
@@ -203,12 +301,21 @@ describe('decompileApp', () => {
       ]
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class A1 extends rt.ExecuteAction {
-        constructor() { super(); this.api = { baseUrl: 'https://api.example.com', url: '/a1', headers: { 'x-key': '123' } }; }
+      class A1 extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { baseUrl: 'https://api.example.com', url: '/a1', headers: { 'x-key': '123' } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
-      class A2 extends rt.ExecuteAction {
-        constructor() { super(); this.api = { baseUrl: 'https://api.example.com', url: '/a2', headers: { 'x-key': '123' } }; }
+      class A2 extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { baseUrl: 'https://api.example.com', url: '/a2', headers: { 'x-key': '123' } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
       module.exports = { a1: A1, a2: A2 };
     `
@@ -238,12 +345,21 @@ describe('decompileApp', () => {
       ]
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class A1 extends rt.ExecuteAction {
-        constructor() { super(); this.api = { url: '/a1', temp: { shared: 'val', unique1: 'x' } }; }
+      class A1 extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/a1', temp: { shared: 'val', unique1: 'x' } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
-      class A2 extends rt.ExecuteAction {
-        constructor() { super(); this.api = { url: '/a2', temp: { shared: 'val', unique2: 'y' } }; }
+      class A2 extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/a2', temp: { shared: 'val', unique2: 'y' } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
       module.exports = { a1: A1, a2: A2 };
     `
@@ -268,9 +384,12 @@ describe('decompileApp', () => {
       actions: [{ name: 'act', parameters: [] }]
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class Act extends rt.ExecuteAction {
-        constructor() { super(); this.api = { url: '/test', iml: { version: 1 } }; }
+      class Act extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/test', iml: { version: 1 } };
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
       module.exports = { act: Act };
     `
@@ -290,9 +409,13 @@ describe('decompileApp', () => {
       actions: [{ name: 'act', parameters: [] }]
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class Act extends rt.ExecuteAction {
-        constructor() { super(); this.api = { url: '/test', metadata: { deprecated: true } }; }
+      class Act extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/test', metadata: { deprecated: true } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
       module.exports = { act: Act };
     `
@@ -312,16 +435,17 @@ describe('decompileApp', () => {
       actions: [{ name: 'act', parameters: [] }]
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class Act extends rt.ExecuteAction {
+      class Act extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             communication: [
               { url: '/step1', method: 'GET' },
               { url: '/step2', method: 'POST' }
             ]
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
       module.exports = { act: Act };
@@ -580,9 +704,13 @@ describe('decompileApp', () => {
   it('parses lib/rpc.js into rpcs/ directory', () => {
     const manifest = { name: 'app' }
     const rpcJs = `
-      const rt = require('app-runtime');
-      class ListItems extends rt.RPC.ExecuteRpc {
-        constructor() { super(); this.api = { url: '/rpc/items', method: 'GET' }; }
+      class ListItems extends ExecuteRpc {
+        constructor() {
+          super();
+          const api = { url: '/rpc/items', method: 'GET' };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
       module.exports = { listItems: ListItems };
     `
@@ -600,11 +728,49 @@ describe('decompileApp', () => {
     expect(rpcApi.url).toBe('/rpc/items')
   })
 
-  it('parses lib/functions.js into functions/ directory', () => {
+  it('resolves a quoted-string-key rpc.js export map (real trello shape) with shorthand and colon-prefixed keys', () => {
+    const manifest = {
+      name: 'app',
+      actions: [{ name: 'watchActivities', parameters: [] }]
+    }
+    const rpcJs = `
+      class getBoardLists2 extends ExecuteRpc {
+        constructor() {
+          super();
+          const api = { url: '/boards/lists', method: 'GET' };
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      class epochModule44 extends ExecuteRpc {
+        constructor() {
+          super();
+          const api = { url: '/activities/epoch', method: 'GET' };
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = {
+        getBoardLists2,
+        'epoch:watchActivities': epochModule44
+      };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/rpc.js', content: rpcJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const rpcApi = parseFile(result, 'rpcs/getBoardLists2/api.imljson') as Record<string, unknown>
+    expect(rpcApi.url).toBe('/boards/lists')
+
+    const epochApi = parseFile(result, 'modules/watchActivities/epoch.imljson') as Record<string, unknown>
+    expect(epochApi.url).toBe('/activities/epoch')
+  })
+
+  it('parses lib/functions.js string-literal exports (real anthropic-claude shape) into functions/ directory', () => {
     const manifest = { name: 'app' }
     const funcJs = `
       module.exports = {
-        myFunc: 'function myFunc(a, b) { return a + b; }'
+        buildFallbackModelOptions: "function buildFallbackModelOptions(model, models = []) { return models[0] || model; }"
       };
     `
     const files: ExtractedFile[] = [
@@ -613,9 +779,11 @@ describe('decompileApp', () => {
     ]
     const result = decompileApp(files, 'app')
 
-    const funcFile = findFile(result, 'functions/myFunc/code.js')
+    const funcFile = findFile(result, 'functions/buildFallbackModelOptions/code.js')
     expect(funcFile).toBeDefined()
-    expect(funcFile!.content).toBe('function myFunc(a, b) { return a + b; }')
+    expect(funcFile!.content).toBe(
+      'function buildFallbackModelOptions(model, models = []) { return models[0] || model; }'
+    )
   })
 
   it('copies asset files as-is', () => {
@@ -654,27 +822,30 @@ describe('decompileApp', () => {
       ]
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class A1 extends rt.ExecuteAction {
+      class A1 extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             baseUrl: 'https://api.example.com',
             url: '/a1',
             headers: { Authorization: 'Bearer {{connection.accessToken}}' },
             log: { sanitize: ['request.headers.authorization'] }
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
-      class A2 extends rt.ExecuteAction {
+      class A2 extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             baseUrl: 'https://api.example.com',
             url: '/a2',
             headers: { Authorization: 'Bearer {{connection.accessToken}}', 'X-Custom': 'val' },
             log: { sanitize: ['request.headers.authorization', 'response.body'] }
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
       module.exports = { a1: A1, a2: A2 };
@@ -720,29 +891,32 @@ describe('decompileApp', () => {
       '200': 'Permissions error'
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class A1 extends rt.ExecuteAction {
+      class A1 extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             url: '/a1',
             response: {
               temp: { errorMessages: ${JSON.stringify(errorMessages)}, uniqueA1: 'x' },
               output: '{{body}}'
             }
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
-      class A2 extends rt.ExecuteAction {
+      class A2 extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             url: '/a2',
             response: {
               temp: { errorMessages: ${JSON.stringify(errorMessages)}, uniqueA2: 'y' },
               output: '{{body}}'
             }
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
       module.exports = { a1: A1, a2: A2 };
@@ -786,32 +960,37 @@ describe('decompileApp', () => {
       ]
     }
     const appJs = `
-      const rt = require('app-runtime');
-      class A1 extends rt.ExecuteAction {
+      class A1 extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             url: '/a1',
             headers: { Authorization: 'Bearer {{connection.accessToken}}' }
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
-      class A2 extends rt.ExecuteAction {
+      class A2 extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             url: '/a2',
             headers: { Authorization: 'Bearer {{connection.accessToken}}' }
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
-      class A3 extends rt.ExecuteAction {
+      class A3 extends ExecuteAction {
         constructor() {
           super();
-          this.api = {
+          const api = {
             url: '/a3',
             headers: { Authorization: 'Bearer {{connection.accessToken}}' }
           };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
       }
       module.exports = { a1: A1, a2: A2, a3: A3 };
@@ -862,14 +1041,19 @@ describe('decompileAccount', () => {
     expect(parseFile(result, 'scopes.imljson')).toEqual({ read: 'Read access', write: 'Write access' })
   })
 
-  it('extracts API from lib/account.js via VM', () => {
+  it('extracts API from lib/account.js (real stripe single-class-export idiom)', () => {
     const manifest = { name: 'conn', label: 'Conn', type: 'basic' }
     const accountJs = `
-      const Base = require('imt_accounts/base');
-      class Account extends Base {
-        constructor() { super(); this.api = { url: '/auth', method: 'POST' }; }
+      const Account = require('imt_accounts/app-runtime-basic');
+      class Connection extends Account {
+        constructor() {
+          super();
+          const api = { url: 'https://api.stripe.com/v1/balance', method: 'GET' };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
-      module.exports = Account;
+      module.exports = Connection;
     `
     const files: ExtractedFile[] = [
       { path: 'manifest.json', content: JSON.stringify(manifest) },
@@ -878,8 +1062,8 @@ describe('decompileAccount', () => {
     const result = decompileAccount(files)
 
     const api = parseFile(result, 'api.imljson') as Record<string, unknown>
-    expect(api.url).toBe('/auth')
-    expect(api.method).toBe('POST')
+    expect(api.url).toBe('https://api.stripe.com/v1/balance')
+    expect(api.method).toBe('GET')
   })
 
   it('defaults to empty objects/arrays for missing fields', () => {
@@ -940,12 +1124,17 @@ describe('decompileHook', () => {
     expect(parseFile(result, 'update.imljson')).toEqual({})
   })
 
-  it('extracts API from lib/hook.js via VM', () => {
+  it('extracts API from lib/hook.js (real const api = <literal> + Object.defineProperty idiom)', () => {
     const manifest = { name: 'hook', label: 'Hook', type: 'web' }
     const hookJs = `
       const Base = require('imt_hooks/base');
       class Hook extends Base {
-        constructor() { super(); this.api = { url: '/webhook', method: 'POST' }; }
+        constructor() {
+          super();
+          const api = { url: '/webhook', method: 'POST' };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
       }
       module.exports = Hook;
     `
