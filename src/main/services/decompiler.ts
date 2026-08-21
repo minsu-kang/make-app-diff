@@ -68,6 +68,9 @@ function logBail(kind: 'app' | 'account' | 'hook', name: string | undefined, err
 // Fields that go into separate files, not metadata.json
 const MODULE_SEPARATE_FIELDS = new Set(['parameters', 'interface', 'scope', 'expect'])
 
+// Endpoint fields that go into separate files, not metadata.json
+const ENDPOINT_SEPARATE_FIELDS = new Set(['inputParameters', 'outputParameters', 'context', 'scope', 'api'])
+
 // RPC types that belong to webhooks, not modules
 const HOOK_RPC_TYPES = new Set(['attach', 'detach', 'update'])
 
@@ -108,6 +111,9 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
 
   const rpcJsFile = files.find((f) => f.path === 'lib/rpc.js')
   const rpcApis = rpcJsFile ? parseCompiledJs(rpcJsFile.content) : {}
+
+  const endpointsJsFile = files.find((f) => f.path === 'lib/endpoints.js')
+  const endpointApis = endpointsJsFile ? parseCompiledJs(endpointsJsFile.content) : {}
 
   const functionsJsFile = files.find((f) => f.path === 'lib/functions.js')
   const functions = functionsJsFile ? parseFunctions(functionsJsFile.content) : {}
@@ -246,6 +252,38 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
 
     // samples.imljson (always empty)
     result.push({ path: `${prefix}/samples.imljson`, content: '{}' })
+  }
+
+  // Generate endpoint files — manifest.endpoints[] (metadata/parameters/context/scope)
+  // paired with lib/endpoints.js classes (api), same base.imljson as modules.
+  // Real manifest.endpoints[] entries (google-email@4.19.2) carry no top-level `scope` or
+  // `api` field — accounts is a map keyed by account name (each with its own `scope`
+  // array), and api only exists compiled in lib/endpoints.js. metadata.json's `accounts`
+  // is flattened to just the account names; scope.imljson is the deduped union of every
+  // attached account's scope array (see extractAccountScopes for the multi-account caveat).
+  const endpoints = (manifest.endpoints || []) as Record<string, unknown>[]
+  for (const endpoint of endpoints) {
+    const name = endpoint.name as string
+    const prefix = `endpoints/${name}`
+
+    const epMeta: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(endpoint)) {
+      if (!ENDPOINT_SEPARATE_FIELDS.has(key)) {
+        epMeta[key] = value
+      }
+    }
+    if (isPlainObj(endpoint.accounts)) {
+      epMeta.accounts = Object.keys(endpoint.accounts)
+    }
+    result.push(makeFile(`${prefix}/metadata.json`, epMeta))
+
+    result.push(makeFile(`${prefix}/inputParameters.imljson`, endpoint.inputParameters || []))
+    result.push(makeFile(`${prefix}/outputParameters.imljson`, endpoint.outputParameters || []))
+    result.push(makeFile(`${prefix}/scope.imljson`, extractAccountScopes(endpoint.accounts)))
+    result.push({ path: `${prefix}/context.md`, content: (endpoint.context as string) || '' })
+
+    const epApiData = cleanApi(endpointApis[name] || {}, baseConfig)
+    result.push(makeFile(`${prefix}/api.imljson`, epApiData))
   }
 
   // Collect webhook names from instant_trigger modules
@@ -963,6 +1001,24 @@ function camelToLabel(name: string): string {
 
 function isPlainObj(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val)
+}
+
+/**
+ * Deduped union of scope arrays across every attached account. The one confirmed real
+ * sample (google-email) only ever has a single account, so this is unverified for the
+ * multi-account case — flagged as an assumption, not a confirmed shape.
+ */
+function extractAccountScopes(accounts: unknown): string[] {
+  if (!isPlainObj(accounts)) return []
+  const scopes = new Set<string>()
+  for (const account of Object.values(accounts)) {
+    if (!isPlainObj(account)) continue
+    const scope = account.scope
+    if (Array.isArray(scope)) {
+      for (const s of scope) scopes.add(String(s))
+    }
+  }
+  return [...scopes]
 }
 
 /**
