@@ -1,5 +1,5 @@
-import * as vm from 'vm'
 import { ExtractedFile } from '../types'
+import { parseCompiledJs, parseFunctions } from './decompiler-sandbox'
 
 // Fields that belong in base.imljson (common across all modules)
 const BASE_TOP_FIELDS = ['baseUrl', 'headers', 'timeout', 'log']
@@ -14,38 +14,47 @@ export function isCustomApp(files: ExtractedFile[]): boolean {
 
 /**
  * Decompile a compiled custom app into SDK structure.
- * On error, returns original files as fallback.
+ * On any construct the static extractor can't resolve, returns the original raw files.
  */
 export function decompileApp(files: ExtractedFile[], appName: string): ExtractedFile[] {
   try {
     return doDecompileApp(files, appName)
-  } catch {
+  } catch (err) {
+    logBail('app', appName, err)
     return files
   }
 }
 
 /**
  * Decompile account files into connection SDK structure.
- * On error, returns original files as fallback.
+ * On any construct the static extractor can't resolve, returns the original raw files.
  */
 export function decompileAccount(files: ExtractedFile[]): ExtractedFile[] {
   try {
     return doDecompileAccount(files)
-  } catch {
+  } catch (err) {
+    logBail('account', undefined, err)
     return files
   }
 }
 
 /**
  * Decompile hook files into webhook SDK structure.
- * On error, returns original files as fallback.
+ * On any construct the static extractor can't resolve, returns the original raw files.
  */
 export function decompileHook(files: ExtractedFile[]): ExtractedFile[] {
   try {
     return doDecompileHook(files)
-  } catch {
+  } catch (err) {
+    logBail('hook', undefined, err)
     return files
   }
+}
+
+function logBail(kind: 'app' | 'account' | 'hook', name: string | undefined, err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err)
+  const label = name ? `${kind} "${name}"` : kind
+  console.error(`[decompiler] static extraction could not decompile ${label}, showing raw compiled files: ${message}`)
 }
 
 // ---- App decompilation ----
@@ -414,138 +423,6 @@ function doDecompileHook(files: ExtractedFile[]): ExtractedFile[] {
   return result
 }
 
-// ---- JS Parsing via vm ----
-
-function createRuntimeMock(): Record<string, unknown> {
-  class Base {}
-  const rpcClasses: Record<string, unknown> = {
-    ExecuteRpc: Base,
-    GetVariableRpc: Base,
-    SetVariableRpc: Base,
-    RpcAttachHook: Base,
-    RpcDetachHook: Base,
-    RpcUpdateHook: Base
-  }
-  return {
-    ExecuteAction: Base,
-    ExecuteSearch: Base,
-    ExecuteTrigger: Base,
-    ExecuteHookTrigger: Base,
-    ExecuteInstantTrigger: Base,
-    Account: Base,
-    BasicAccount: Base,
-    OAuth2Account: Base,
-    RPC: rpcClasses,
-    ...rpcClasses,
-    default: {
-      ExecuteAction: Base,
-      ExecuteSearch: Base
-    }
-  }
-}
-
-function parseCompiledJs(code: string): Record<string, unknown> {
-  const mock = createRuntimeMock()
-  class SingleBase {}
-  const moduleExports: Record<string, unknown> = {}
-  const sandbox: Record<string, unknown> = {
-    module: { exports: moduleExports },
-    exports: moduleExports,
-    require: (name: string) => {
-      // Hook/account runtimes export a single base class
-      if (name.includes('imt_hooks/') || name.includes('imt_accounts/')) {
-        return SingleBase
-      }
-      // App module runtimes export named classes
-      if (name.includes('app-runtime') || name.includes('imt_modules/')) {
-        return mock
-      }
-      if (name === './functions' || name === './rpc') return {}
-      return {}
-    },
-    console: { log: noop, warn: noop, error: noop, info: noop, debug: noop },
-    setTimeout: noop,
-    clearTimeout: noop,
-    setInterval: noop,
-    clearInterval: noop,
-    Buffer,
-    process: { env: {} },
-    global: {}
-  }
-
-  try {
-    vm.runInNewContext(code, sandbox, { timeout: 5000 })
-  } catch {
-    return {}
-  }
-
-  const exportsObj = (sandbox.module as Record<string, unknown>).exports
-
-  // Handle single-class export (hook.js, account.js): module.exports = Class
-  if (typeof exportsObj === 'function') {
-    return extractApiFromClass(exportsObj)
-  }
-
-  // Handle multi-class export (app.js, rpc.js): module.exports = { name: Class, ... }
-  const result: Record<string, unknown> = {}
-  for (const [name, value] of Object.entries(exportsObj as Record<string, unknown>)) {
-    // Skip non-module exports (e.g., RPC: require('./rpc') in app.js)
-    if (name === 'RPC') continue
-    if (typeof value === 'function') {
-      const apis = extractApiFromClass(value, name)
-      Object.assign(result, apis)
-    }
-  }
-  return result
-}
-
-function extractApiFromClass(ClassRef: unknown, name?: string): Record<string, unknown> {
-  try {
-    const instance = new (ClassRef as new () => Record<string, unknown>)()
-    if (instance.api) {
-      const api = { ...(instance.api as Record<string, unknown>) }
-      // Strip compile-time iml field
-      delete api.iml
-      const key = name || 'default'
-      return { [key]: api }
-    }
-  } catch {
-    /* skip classes that fail to instantiate */
-  }
-  return {}
-}
-
-function parseFunctions(code: string): Record<string, string> {
-  const moduleExports: Record<string, unknown> = {}
-  const sandbox: Record<string, unknown> = {
-    module: { exports: moduleExports },
-    exports: moduleExports,
-    require: () => ({}),
-    console: { log: noop, warn: noop, error: noop, info: noop, debug: noop },
-    Buffer
-  }
-
-  try {
-    vm.runInNewContext(code, sandbox, { timeout: 5000 })
-  } catch {
-    return {}
-  }
-
-  const result: Record<string, string> = {}
-  const exportsObj = (sandbox.module as Record<string, unknown>).exports as Record<string, unknown>
-
-  for (const [name, value] of Object.entries(exportsObj)) {
-    if (typeof value === 'string') {
-      // Compiled functions are exported as strings — extract the function body
-      result[name] = value
-    } else if (typeof value === 'function') {
-      result[name] = value.toString()
-    }
-  }
-
-  return result
-}
-
 // ---- Base extraction ----
 
 /**
@@ -553,7 +430,7 @@ function parseFunctions(code: string): Record<string, string> {
  * For top-level fields: uses frequency-based approach across ALL communication steps.
  * For response.error / response.temp / temp: requires identical values across ALL modules.
  */
-function extractBaseFromAll(apis: Record<string, unknown>[]): Record<string, unknown> {
+export function extractBaseFromAll(apis: Record<string, unknown>[]): Record<string, unknown> {
   const base: Record<string, unknown> = {}
 
   // For each base field, find the most common value across all modules and communication steps.
@@ -773,7 +650,7 @@ function extractCommonTemp(apis: Record<string, unknown>[]): Record<string, unkn
  * If api has `communication`, extract the array and remove base fields from each element.
  * Otherwise, remove base fields from the single object.
  */
-function cleanApi(raw: unknown, baseConfig: Record<string, unknown>): unknown {
+export function cleanApi(raw: unknown, baseConfig: Record<string, unknown>): unknown {
   const hasBase = Object.keys(baseConfig).length > 0
   const api = raw as Record<string, unknown>
 
@@ -921,5 +798,3 @@ function removeCommonFields(epoch: Record<string, unknown>, modApi: Record<strin
   }
   return result
 }
-
-function noop(): void {}

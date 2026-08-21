@@ -48,6 +48,13 @@ function assertNumber(value: unknown, name: string): asserts value is number {
   }
 }
 
+// Rejects path separators and `..`/`.` so appName/version can't escape the tmpdir prefix via path.join
+function assertPathSegment(value: unknown, name: string): asserts value is string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9._@-]+$/.test(value) || value === '.' || value === '..') {
+    throw new Error(`Invalid ${name}`)
+  }
+}
+
 function sanitizePath(baseDir: string, filePath: string): string {
   const normalized = path.normalize(filePath)
   if (path.isAbsolute(normalized) || normalized.startsWith('..')) {
@@ -58,6 +65,12 @@ function sanitizePath(baseDir: string, filePath: string): string {
     throw new Error(`Path traversal detected: ${filePath}`)
   }
   return resolved
+}
+
+/** Strips absolute-path markers and leading `..` segments so a PKR-supplied path can't zip-slip out of the archive root */
+function sanitizeZipEntryName(filePath: string): string {
+  const normalized = path.normalize(filePath).replace(/^(\.\.[/\\])+/, '')
+  return normalized.replace(/^([/\\]+|[a-zA-Z]:[/\\]?)/, '')
 }
 
 interface RawDepEntry {
@@ -475,12 +488,14 @@ export function registerIpcHandlers(): void {
     'editor:open-in-vscode',
     async (_event, opts: { appName: string; version: string; files: { path: string; content: string }[] }) => {
       try {
+        assertPathSegment(opts.appName, 'appName')
+        assertPathSegment(opts.version, 'version')
         const tmpDir = path.join(tmpdir(), 'makediff', `${opts.appName}@${opts.version}`)
         await fs.rm(tmpDir, { recursive: true, force: true })
         await fs.mkdir(tmpDir, { recursive: true })
 
         for (const file of opts.files) {
-          const filePath = path.join(tmpDir, file.path)
+          const filePath = sanitizePath(tmpDir, file.path)
           await fs.mkdir(path.dirname(filePath), { recursive: true })
           await fs.writeFile(filePath, file.content, 'utf-8')
         }
@@ -636,6 +651,8 @@ export function registerIpcHandlers(): void {
       }
     ) => {
       try {
+        assertPathSegment(opts.appName, 'appName')
+        assertPathSegment(opts.version, 'version')
         const tmpDir = path.join(tmpdir(), 'makediff')
         await fs.mkdir(tmpDir, { recursive: true })
 
@@ -649,7 +666,7 @@ export function registerIpcHandlers(): void {
           archive.on('error', reject)
           archive.pipe(output)
           for (const file of opts.files) {
-            archive.append(file.content, { name: file.path })
+            archive.append(file.content, { name: sanitizeZipEntryName(file.path) })
           }
           archive.finalize()
         })
