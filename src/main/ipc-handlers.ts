@@ -60,6 +60,12 @@ function sanitizePath(baseDir: string, filePath: string): string {
   return resolved
 }
 
+/** Strips absolute-path markers and leading `..` segments so a PKR-supplied path can't zip-slip out of the archive root */
+function sanitizeZipEntryName(filePath: string): string {
+  const normalized = path.normalize(filePath).replace(/^(\.\.[/\\])+/, '')
+  return normalized.replace(/^([/\\]+|[a-zA-Z]:[/\\]?)/, '')
+}
+
 interface RawDepEntry {
   depName: string
   files: ExtractedFile[]
@@ -480,7 +486,7 @@ export function registerIpcHandlers(): void {
         await fs.mkdir(tmpDir, { recursive: true })
 
         for (const file of opts.files) {
-          const filePath = path.join(tmpDir, file.path)
+          const filePath = sanitizePath(tmpDir, file.path)
           await fs.mkdir(path.dirname(filePath), { recursive: true })
           await fs.writeFile(filePath, file.content, 'utf-8')
         }
@@ -649,7 +655,7 @@ export function registerIpcHandlers(): void {
           archive.on('error', reject)
           archive.pipe(output)
           for (const file of opts.files) {
-            archive.append(file.content, { name: file.path })
+            archive.append(file.content, { name: sanitizeZipEntryName(file.path) })
           }
           archive.finalize()
         })
