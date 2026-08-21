@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.5](https://github.com/minsu-kang/make-app-diff/compare/v1.5.4...v1.5.5) (2026-08-21)
+
+
+### Bug Fixes
+
+* correct decompiler base-field extraction rules ([44256a6](https://github.com/minsu-kang/make-app-diff/commit/44256a664e9435fb91c38a6a97ccabc83efb6df6))
+* correct decompiler base-field extraction rules ([d59bd1e](https://github.com/minsu-kang/make-app-diff/commit/d59bd1e29ed1fce7202a495c45aef10d4ce91fd0))
+* **deps:** upgrade electron 35.7.5 to 43.4.1 and fix postinstall ([528028c](https://github.com/minsu-kang/make-app-diff/commit/528028c506fa9bafa9924fa12338e9a63a9c46a9))
+* **deps:** upgrade electron 35.7.5 to 43.4.1 and fix postinstall ([53cdca4](https://github.com/minsu-kang/make-app-diff/commit/53cdca4579126eb30fe7a52aea4d2f18773d95a5))
+
 ## [1.5.4](https://github.com/minsu-kang/make-app-diff/compare/v1.5.3...v1.5.4) (2026-08-21)
 
 
