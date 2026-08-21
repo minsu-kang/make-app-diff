@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.4](https://github.com/minsu-kang/make-app-diff/compare/v1.5.3...v1.5.4) (2026-08-21)
+
+
+### Bug Fixes
+
+* **deps:** pin exact versions and apply security bumps ([e93192a](https://github.com/minsu-kang/make-app-diff/commit/e93192a445d0a0cb7188820b5d76258684cb438b))
+* **deps:** regenerate lockfile with npm install, drop bad lodash release ([e0e5417](https://github.com/minsu-kang/make-app-diff/commit/e0e54170e98aea6d1d3cbaf8742ad8819713f213))
+* harden decompiler against untrusted app code and unsafe paths ([3a50820](https://github.com/minsu-kang/make-app-diff/commit/3a50820ca5e0e0102447f488b236e8a6e4421b0b))
+* sanitize archive entry paths before writing to disk ([daff651](https://github.com/minsu-kang/make-app-diff/commit/daff65193501eb9f228f7291d14a49834b609c5e))
+
 ## [1.5.3](https://github.com/minsu-kang/make-app-diff/compare/v1.5.2...v1.5.3) (2026-08-21)
 
 
