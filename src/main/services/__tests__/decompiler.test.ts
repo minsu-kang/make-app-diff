@@ -764,6 +764,158 @@ describe('decompileApp', () => {
     expect(epochApi.url).toBe('/activities/epoch')
   })
 
+  it('parses lib/endpoints.js + manifest.endpoints[] into endpoints/ directory (real google-email shape)', () => {
+    const manifest = {
+      name: 'app',
+      endpoints: [
+        {
+          name: 'createDraft',
+          label: 'Create a draft',
+          description: 'Creates a new draft.',
+          context: '---\nname: createDraft\ndescription: This endpoint can be used to create a draft message\n---\n\nCreates a draft with the DRAFT label',
+          annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true, readOnlyHint: false },
+          accounts: { 'google-email': { scope: ['https://www.googleapis.com/auth/gmail.modify'] } },
+          deprecated: false,
+          schemaVersion: 1,
+          inputParameters: [{ label: 'To', name: 'to', required: true, type: 'array' }],
+          outputParameters: [{ label: 'Draft ID', name: 'id', type: 'text' }]
+        }
+      ]
+    }
+    const endpointsJs = `
+      class createDraft extends ExecuteRpc {
+        constructor() {
+          super();
+          const api = {
+            url: '/drafts',
+            method: 'POST',
+            baseUrl: 'https://gmail.googleapis.com/gmail/v1/users/me',
+            headers: { Authorization: 'Bearer {{connection.accessToken}}' }
+          };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { createDraft };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/endpoints.js', content: endpointsJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const meta = parseFile(result, 'endpoints/createDraft/metadata.json') as Record<string, unknown>
+    expect(meta.name).toBe('createDraft')
+    expect(meta.label).toBe('Create a draft')
+    expect(meta.accounts).toEqual(['google-email'])
+    expect(meta.deprecated).toBe(false)
+    expect(meta.schemaVersion).toBe(1)
+    expect(meta.context).toBeUndefined()
+    expect(meta.scope).toBeUndefined()
+    expect(meta.inputParameters).toBeUndefined()
+    expect(meta.outputParameters).toBeUndefined()
+    expect(meta.api).toBeUndefined()
+
+    const inputParams = parseFile(result, 'endpoints/createDraft/inputParameters.imljson')
+    expect(inputParams).toEqual(manifest.endpoints[0].inputParameters)
+
+    const outputParams = parseFile(result, 'endpoints/createDraft/outputParameters.imljson')
+    expect(outputParams).toEqual(manifest.endpoints[0].outputParameters)
+
+    // scope.imljson is pulled from accounts.<name>.scope, not a top-level manifest field
+    const scope = parseFile(result, 'endpoints/createDraft/scope.imljson')
+    expect(scope).toEqual(['https://www.googleapis.com/auth/gmail.modify'])
+
+    const contextFile = findFile(result, 'endpoints/createDraft/context.md')
+    expect(contextFile!.content).toBe(manifest.endpoints[0].context)
+
+    const api = parseFile(result, 'endpoints/createDraft/api.imljson') as Record<string, unknown>
+    expect(api.url).toBe('/drafts')
+    expect(api.method).toBe('POST')
+    expect(api.baseUrl).toBe('https://gmail.googleapis.com/gmail/v1/users/me')
+  })
+
+  // No real multi-account sample exists to confirm this against — asserts the assumed
+  // dedup-union aggregation, not a confirmed real shape.
+  it('unions and dedupes scopes across multiple attached accounts (unconfirmed multi-account assumption)', () => {
+    const manifest = {
+      name: 'app',
+      endpoints: [
+        {
+          name: 'multiAcct',
+          label: 'Multi Account',
+          accounts: {
+            acctA: { scope: ['scope1', 'scope2'] },
+            acctB: { scope: ['scope2', 'scope3'] }
+          }
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    const meta = parseFile(result, 'endpoints/multiAcct/metadata.json') as Record<string, unknown>
+    expect(meta.accounts).toEqual(['acctA', 'acctB'])
+
+    const scope = parseFile(result, 'endpoints/multiAcct/scope.imljson') as string[]
+    expect(scope.sort()).toEqual(['scope1', 'scope2', 'scope3'])
+  })
+
+  it('strips endpoint api.imljson fields that match base.imljson shared with 2+ modules', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'a1', parameters: [] },
+        { name: 'a2', parameters: [] }
+      ],
+      endpoints: [{ name: 'ep1', label: 'Endpoint One' }]
+    }
+    const appJs = `
+      class A1 extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { baseUrl: 'https://api.example.com', url: '/a1', headers: { 'x-key': '123' } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      class A2 extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { baseUrl: 'https://api.example.com', url: '/a2', headers: { 'x-key': '123' } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { a1: A1, a2: A2 };
+    `
+    const endpointsJs = `
+      class ep1 extends ExecuteRpc {
+        constructor() {
+          super();
+          const api = { baseUrl: 'https://api.example.com', url: '/ep1', headers: { 'x-key': '123' } };
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { ep1 };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs },
+      { path: 'lib/endpoints.js', content: endpointsJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.baseUrl).toBe('https://api.example.com')
+
+    const epApi = parseFile(result, 'endpoints/ep1/api.imljson') as Record<string, unknown>
+    expect(epApi.baseUrl).toBeUndefined()
+    expect(epApi.headers).toBeUndefined()
+    expect(epApi.url).toBe('/ep1')
+  })
+
   it('parses lib/functions.js string-literal exports (real anthropic-claude shape) into functions/ directory', () => {
     const manifest = { name: 'app' }
     const funcJs = `
