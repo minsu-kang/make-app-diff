@@ -1,9 +1,15 @@
 import { ExtractedFile } from '../types'
 import { parseCompiledJs, parseFunctions } from './decompiler-sandbox'
 
-// Fields that belong in base.imljson (common across all modules)
-const BASE_TOP_FIELDS = ['baseUrl', 'headers', 'timeout', 'log']
-const BASE_RESPONSE_FIELDS = ['error']
+// Scalar fields that belong in base.imljson (common across all modules). `method` is
+// deliberately excluded: it must never be promoted to base or stripped from any
+// module/step, regardless of whether it matches — every component keeps its own.
+const BASE_TOP_FIELDS = ['baseUrl', 'timeout', 'body']
+// Root-level fields with their own dedicated nested-aware extraction below (response's
+// error/valid/temp sub-handling, temp's own extraction, body's scalar-vs-object handling
+// via BASE_TOP_FIELDS above); excluded from the generic per-key composite-field
+// discovery so they aren't processed twice.
+const DEDICATED_FIELDS = new Set(['response', 'temp', 'metadata', 'body'])
 
 /**
  * Check if extracted files represent a custom (compiled) app
@@ -425,16 +431,61 @@ function doDecompileHook(files: ExtractedFile[]): ExtractedFile[] {
 
 // ---- Base extraction ----
 
+// Scalar fields (baseUrl, timeout, body, response.valid-as-scalar) only need a plurality
+// of the vote; composite object sub-keys (headers.foo, qs.foo, response.error.429, ...)
+// need near-unanimous agreement, since a coincidental partial match there is far more
+// likely to be a per-module accident than a genuine app-wide convention. 0.9 (not a full
+// 1.0) is a deliberate choice: real data across three apps shows genuine app-wide
+// conventions land at 94.7%-100% (blocked by exactly one or two outlier modules out of
+// 19-53), while genuine per-module accidents land at 14.3%-66.7% — 0.9 sits in the gap.
+const SCALAR_MIN_VALUE_SHARE = 0.3
+const COMPOSITE_MIN_VALUE_SHARE = 0.9
+
 /**
- * Scan all module APIs to find base fields.
- * For top-level fields: uses frequency-based approach across ALL communication steps.
- * For response.error / response.temp / temp: requires identical values across ALL modules.
+ * Two-gate promotion check shared by scalar, response, and composite-field extraction.
+ * Gate 1: the key must have some value in every one of the `totalComponents` in scope —
+ * if even one component lacks it entirely, promotion is skipped, no vote is taken.
+ * Gate 2: among those (now 100%-present) values, the plurality winner must hold at least
+ * `minShare` of the vote; each component votes once per unique value it shows.
+ */
+function pluralityWinner(
+  perComponentValues: string[][],
+  totalComponents: number,
+  minShare: number
+): string | undefined {
+  if (perComponentValues.length !== totalComponents) return undefined
+
+  const freq = new Map<string, number>()
+  for (const vals of perComponentValues) {
+    const unique = new Set(vals)
+    for (const v of unique) {
+      freq.set(v, (freq.get(v) || 0) + 1)
+    }
+  }
+
+  let bestVal: string | undefined
+  let bestCount = 0
+  for (const [v, count] of freq) {
+    if (count > bestCount) {
+      bestVal = v
+      bestCount = count
+    }
+  }
+
+  if (bestVal !== undefined && bestCount / totalComponents >= minShare) {
+    return bestVal
+  }
+  return undefined
+}
+
+/**
+ * Scan all module APIs to find base fields, using the two-gate `pluralityWinner` check
+ * (100% presence, then plurality-of-value) for scalar, response, and composite fields.
+ * response.temp / temp use their own dedicated identical-across-all-modules extraction.
  */
 export function extractBaseFromAll(apis: Record<string, unknown>[]): Record<string, unknown> {
   const base: Record<string, unknown> = {}
 
-  // For each base field, find the most common value across all modules and communication steps.
-  // A value qualifies as "base" if it appears in 2+ modules.
   for (const field of BASE_TOP_FIELDS) {
     // Collect all values per module (a module may have multiple comm steps)
     const moduleValues: string[][] = []
@@ -457,70 +508,58 @@ export function extractBaseFromAll(apis: Record<string, unknown>[]): Record<stri
       if (vals.length > 0) moduleValues.push(vals)
     }
 
-    if (moduleValues.length < 2) continue
-
-    // Find the most frequent value across all steps of all modules
-    const freq = new Map<string, number>()
-    for (const vals of moduleValues) {
-      // Count unique values per module (each module votes once per unique value)
-      const unique = new Set(vals)
-      for (const v of unique) {
-        freq.set(v, (freq.get(v) || 0) + 1)
-      }
-    }
-
-    // Pick the value present in the most modules (must be 2+)
-    let bestVal = ''
-    let bestCount = 0
-    for (const [v, count] of freq) {
-      if (count > bestCount) {
-        bestVal = v
-        bestCount = count
-      }
-    }
-
-    if (bestCount >= 2) {
+    const bestVal = pluralityWinner(moduleValues, apis.length, SCALAR_MIN_VALUE_SHARE)
+    if (bestVal !== undefined) {
       base[field] = JSON.parse(bestVal)
     }
   }
 
-  // Extract response.error — only if identical across ALL modules that have it
-  // Scans all communication steps, uses frequency-based approach like top-level fields
-  for (const field of BASE_RESPONSE_FIELDS) {
+  // Extract common sub-keys of any other object-valued root field (headers, qs, ...
+  // whatever a given app happens to use), discovered dynamically rather than by name
+  for (const field of discoverCompositeFields(apis)) {
+    const common = extractCommonObjectField(apis, (api) => collectFieldObjects(api, field))
+    if (Object.keys(common).length > 0) {
+      base[field] = common
+    }
+  }
+
+  // response.error is always object-shaped (status code -> {type, message}); dedupe its
+  // sub-keys the same way as headers/qs, not as one atomic blob — a per-step override of
+  // a single status code shouldn't drag the other, genuinely shared, codes along with it.
+  const baseError = extractCommonObjectField(apis, (api) =>
+    getAllResponseObjs(api)
+      .map((r) => r.error)
+      .filter(isPlainObj)
+  )
+  if (Object.keys(baseError).length > 0) {
+    if (!base.response) base.response = {}
+    ;(base.response as Record<string, unknown>).error = baseError
+  }
+
+  // response.valid is usually a scalar (boolean/template string) but is object-shaped for
+  // some modules (e.g. { condition }); try the composite per-key path first, and only fall
+  // back to a scalar plurality match if no object-shaped consensus was found.
+  const baseValidObj = extractCommonObjectField(apis, (api) =>
+    getAllResponseObjs(api)
+      .map((r) => r.valid)
+      .filter(isPlainObj)
+  )
+  if (Object.keys(baseValidObj).length > 0) {
+    if (!base.response) base.response = {}
+    ;(base.response as Record<string, unknown>).valid = baseValidObj
+  } else {
     const moduleValues: string[][] = []
     for (const api of apis) {
-      const responses = getAllResponseObjs(api)
       const vals: string[] = []
-      for (const response of responses) {
-        if (response[field] !== undefined) {
-          vals.push(JSON.stringify(response[field]))
-        }
+      for (const response of getAllResponseObjs(api)) {
+        if (response.valid !== undefined) vals.push(JSON.stringify(response.valid))
       }
       if (vals.length > 0) moduleValues.push(vals)
     }
-
-    if (moduleValues.length < 2) continue
-
-    const freq = new Map<string, number>()
-    for (const vals of moduleValues) {
-      const unique = new Set(vals)
-      for (const v of unique) {
-        freq.set(v, (freq.get(v) || 0) + 1)
-      }
-    }
-
-    let bestVal = ''
-    let bestCount = 0
-    for (const [v, count] of freq) {
-      if (count > bestCount) {
-        bestVal = v
-        bestCount = count
-      }
-    }
-
-    if (bestCount >= 2) {
+    const bestVal = pluralityWinner(moduleValues, apis.length, SCALAR_MIN_VALUE_SHARE)
+    if (bestVal !== undefined) {
       if (!base.response) base.response = {}
-      ;(base.response as Record<string, unknown>)[field] = JSON.parse(bestVal)
+      ;(base.response as Record<string, unknown>).valid = JSON.parse(bestVal)
     }
   }
 
@@ -646,6 +685,99 @@ function extractCommonTemp(apis: Record<string, unknown>[]): Record<string, unkn
 }
 
 /**
+ * Finds every root-level key across all module APIs (flat api or any communication step)
+ * whose value is a plain object, excluding fields that already have dedicated handling.
+ */
+function discoverCompositeFields(apis: Record<string, unknown>[]): string[] {
+  const fields = new Set<string>()
+  for (const api of apis) {
+    collectObjectKeys(api, fields)
+    const comm = api.communication as Record<string, unknown>[] | undefined
+    if (Array.isArray(comm)) {
+      for (const step of comm) collectObjectKeys(step, fields)
+    }
+  }
+  for (const excluded of DEDICATED_FIELDS) fields.delete(excluded)
+  return [...fields]
+}
+
+function collectObjectKeys(obj: Record<string, unknown>, out: Set<string>): void {
+  for (const [key, value] of Object.entries(obj)) {
+    if (isPlainObj(value)) out.add(key)
+  }
+}
+
+/**
+ * Find sub-keys of an object-valued field (headers, qs, response.error, ...) that are
+ * common across every module in the app, using the same `pluralityWinner` gate 1 as
+ * scalar/response fields (a sub-key only reaches a vote if literally every module in
+ * `apis` has it — gate 1 uses `apis.length`, not just the modules that have the parent
+ * field at all, so a field used by only a handful of modules can never pass this) but a
+ * stricter gate 2: COMPOSITE_MIN_VALUE_SHARE requires unanimous agreement, not just a
+ * plurality, since a coincidental partial match on a composite sub-key is more likely a
+ * per-module accident than an app-wide convention. A module with a different value for
+ * the same key keeps that as an override (removeBaseFields). `collect` returns the
+ * object-shaped occurrences of the field for one module's api — `collectFieldObjects`
+ * for a plain root-level field, or a response-scoped getter for response.error/valid.
+ */
+function extractCommonObjectField(
+  apis: Record<string, unknown>[],
+  collect: (api: Record<string, unknown>) => Record<string, unknown>[]
+): Record<string, unknown> {
+  const moduleObjs: Record<string, unknown>[][] = []
+  for (const api of apis) {
+    const objs = collect(api)
+    if (objs.length > 0) moduleObjs.push(objs)
+  }
+
+  if (moduleObjs.length === 0) return {}
+
+  const allKeys = new Set<string>()
+  for (const objs of moduleObjs) {
+    for (const obj of objs) {
+      for (const key of Object.keys(obj)) allKeys.add(key)
+    }
+  }
+
+  const common: Record<string, unknown> = {}
+  for (const key of allKeys) {
+    const perModuleValues: string[][] = []
+    for (const objs of moduleObjs) {
+      const vals = objs.filter((o) => o[key] !== undefined).map((o) => JSON.stringify(o[key]))
+      if (vals.length > 0) perModuleValues.push(vals)
+    }
+
+    const bestVal = pluralityWinner(perModuleValues, apis.length, COMPOSITE_MIN_VALUE_SHARE)
+    if (bestVal !== undefined) {
+      common[key] = JSON.parse(bestVal)
+    }
+  }
+
+  return common
+}
+
+/**
+ * Gathers the object-valued occurrences of `field` for one module's api, checking both
+ * the flat api and every communication step.
+ */
+function collectFieldObjects(api: Record<string, unknown>, field: string): Record<string, unknown>[] {
+  const objs: Record<string, unknown>[] = []
+  const val = api[field]
+  if (isPlainObj(val)) {
+    objs.push(val)
+    return objs
+  }
+  const comm = api.communication as Record<string, unknown>[] | undefined
+  if (Array.isArray(comm)) {
+    for (const step of comm) {
+      const stepVal = step[field]
+      if (isPlainObj(stepVal)) objs.push(stepVal)
+    }
+  }
+  return objs
+}
+
+/**
  * Unwrap communication array and remove base fields.
  * If api has `communication`, extract the array and remove base fields from each element.
  * Otherwise, remove base fields from the single object.
@@ -673,6 +805,22 @@ export function cleanApi(raw: unknown, baseConfig: Record<string, unknown>): unk
   return api
 }
 
+/**
+ * Diffs an object-shaped module value against the matching base object, keeping only the
+ * sub-keys that don't match base. Returns undefined if `value` isn't a plain object (so
+ * callers can fall back to keeping it as-is) rather than a scalar-vs-object mismatch.
+ */
+function diffAgainstBaseObject(value: unknown, baseObj: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!isPlainObj(value)) return undefined
+  const diffed: Record<string, unknown> = {}
+  for (const [key, v] of Object.entries(value)) {
+    if (!(key in baseObj) || JSON.stringify(v) !== JSON.stringify(baseObj[key])) {
+      diffed[key] = v
+    }
+  }
+  return diffed
+}
+
 function removeBaseFields(api: Record<string, unknown>, baseConfig: Record<string, unknown>): Record<string, unknown> {
   const result = { ...api }
 
@@ -683,6 +831,20 @@ function removeBaseFields(api: Record<string, unknown>, baseConfig: Record<strin
         delete result[field]
       }
       // If values differ, keep the module-specific value
+    }
+  }
+
+  // Remove common composite-field sub-keys (whichever fields extraction found), keep module-specific ones
+  for (const field of Object.keys(baseConfig)) {
+    if (BASE_TOP_FIELDS.includes(field) || DEDICATED_FIELDS.has(field)) continue
+    const baseFieldObj = baseConfig[field] as Record<string, unknown>
+    const diffed = diffAgainstBaseObject(result[field], baseFieldObj)
+    if (diffed !== undefined) {
+      if (Object.keys(diffed).length > 0) {
+        result[field] = diffed
+      } else {
+        delete result[field]
+      }
     }
   }
 
@@ -708,10 +870,37 @@ function removeBaseFields(api: Record<string, unknown>, baseConfig: Record<strin
         } else {
           moduleResponse[key] = value
         }
-      } else if (BASE_RESPONSE_FIELDS.includes(key) && baseResponse[key] !== undefined) {
-        // Remove base response fields (e.g. error) only if they match base
-        if (JSON.stringify(value) !== JSON.stringify(baseResponse[key])) {
-          moduleResponse[key] = value
+      } else if (key === 'error') {
+        // response.error is object-shaped (status code -> {type, message}); drop only the
+        // sub-keys that match base, keeping this module's own overridden status codes
+        const baseError = baseResponse.error as Record<string, unknown> | undefined
+        if (baseError) {
+          const diffed = diffAgainstBaseObject(value, baseError)
+          if (diffed === undefined) {
+            moduleResponse.error = value
+          } else if (Object.keys(diffed).length > 0) {
+            moduleResponse.error = diffed
+          }
+        } else {
+          moduleResponse.error = value
+        }
+      } else if (key === 'valid') {
+        // response.valid is usually a scalar but can be object-shaped for some modules;
+        // diff per-key when base is object-shaped, otherwise fall back to a scalar match
+        const baseValid = baseResponse.valid
+        if (baseValid !== undefined) {
+          if (isPlainObj(baseValid)) {
+            const diffed = diffAgainstBaseObject(value, baseValid)
+            if (diffed === undefined) {
+              moduleResponse.valid = value
+            } else if (Object.keys(diffed).length > 0) {
+              moduleResponse.valid = diffed
+            }
+          } else if (JSON.stringify(value) !== JSON.stringify(baseValid)) {
+            moduleResponse.valid = value
+          }
+        } else {
+          moduleResponse.valid = value
         }
       } else {
         moduleResponse[key] = value

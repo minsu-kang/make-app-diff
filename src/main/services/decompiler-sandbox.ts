@@ -190,7 +190,7 @@ export function parseCompiledJs(code: string): Record<string, unknown> {
         throw new Error(`unsupported export member: ${prop.type}`)
       }
       const exportName = staticPropertyKey(prop)
-      if (exportName === 'RPC') continue
+      if (exportName === 'RPC' || exportName === 'ENDPOINTS') continue
       const value = prop.value as Node
       if (value.type !== 'Identifier') throw new Error(`unsupported export value for ${exportName}`)
       const api = resolveClass(value.name as string)
