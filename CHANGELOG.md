@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/minsu-kang/make-app-diff/compare/v1.5.5...v1.6.0) (2026-08-21)
+
+
+### Features
+
+* decompile Endpoint SDK components ([6fd5450](https://github.com/minsu-kang/make-app-diff/commit/6fd54501113f4a183a9d100a9cc90fcef9113f57))
+* decompile Endpoint SDK components ([5df47e7](https://github.com/minsu-kang/make-app-diff/commit/5df47e70a723f48cc0bb26b5c315893c4f3bea28))
+
 ## [1.5.5](https://github.com/minsu-kang/make-app-diff/compare/v1.5.4...v1.5.5) (2026-08-21)
 
 
