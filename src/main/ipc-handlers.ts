@@ -48,6 +48,13 @@ function assertNumber(value: unknown, name: string): asserts value is number {
   }
 }
 
+// Rejects path separators and `..`/`.` so appName/version can't escape the tmpdir prefix via path.join
+function assertPathSegment(value: unknown, name: string): asserts value is string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9._@-]+$/.test(value) || value === '.' || value === '..') {
+    throw new Error(`Invalid ${name}`)
+  }
+}
+
 function sanitizePath(baseDir: string, filePath: string): string {
   const normalized = path.normalize(filePath)
   if (path.isAbsolute(normalized) || normalized.startsWith('..')) {
@@ -481,6 +488,8 @@ export function registerIpcHandlers(): void {
     'editor:open-in-vscode',
     async (_event, opts: { appName: string; version: string; files: { path: string; content: string }[] }) => {
       try {
+        assertPathSegment(opts.appName, 'appName')
+        assertPathSegment(opts.version, 'version')
         const tmpDir = path.join(tmpdir(), 'makediff', `${opts.appName}@${opts.version}`)
         await fs.rm(tmpDir, { recursive: true, force: true })
         await fs.mkdir(tmpDir, { recursive: true })
@@ -642,6 +651,8 @@ export function registerIpcHandlers(): void {
       }
     ) => {
       try {
+        assertPathSegment(opts.appName, 'appName')
+        assertPathSegment(opts.version, 'version')
         const tmpDir = path.join(tmpdir(), 'makediff')
         await fs.mkdir(tmpDir, { recursive: true })
 
