@@ -772,7 +772,8 @@ describe('decompileApp', () => {
           name: 'createDraft',
           label: 'Create a draft',
           description: 'Creates a new draft.',
-          context: '---\nname: createDraft\ndescription: This endpoint can be used to create a draft message\n---\n\nCreates a draft with the DRAFT label',
+          context:
+            '---\nname: createDraft\ndescription: This endpoint can be used to create a draft message\n---\n\nCreates a draft with the DRAFT label',
           annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: true, readOnlyHint: false },
           accounts: { 'google-email': { scope: ['https://www.googleapis.com/auth/gmail.modify'] } },
           deprecated: false,
