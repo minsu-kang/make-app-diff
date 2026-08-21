@@ -181,7 +181,7 @@ describe('decompileApp', () => {
       class MyAction extends ExecuteAction {
         constructor() {
           super();
-          const api = { url: '/test', method: 'GET' };
+          const api = { url: '/test' };
           if (api) api.iml = {functions: require('./functions')};
           Object.defineProperty(this, 'api', {get: () => api, set: () => null});
         }
@@ -196,7 +196,6 @@ describe('decompileApp', () => {
 
     const api = parseFile(result, 'modules/myAction/api.imljson') as Record<string, unknown>
     expect(api.url).toBe('/test')
-    expect(api.method).toBe('GET')
   })
 
   it('reads api from the legacy this.api = <literal> assignment shape (defensive path, real compiler never emits it)', () => {
@@ -208,7 +207,7 @@ describe('decompileApp', () => {
       class Act extends ExecuteAction {
         constructor() {
           super();
-          this.api = { url: '/legacy', method: 'GET' };
+          this.api = { url: '/legacy' };
         }
       }
       module.exports = { act: Act };
@@ -221,7 +220,6 @@ describe('decompileApp', () => {
 
     const api = parseFile(result, 'modules/act/api.imljson') as Record<string, unknown>
     expect(api.url).toBe('/legacy')
-    expect(api.method).toBe('GET')
   })
 
   it('resolves the const api = null shape (real production shape, e.g. slack ExecuteHookTrigger classes) to an empty api.imljson', () => {
@@ -857,22 +855,23 @@ describe('decompileApp', () => {
     const result = decompileApp(files, 'app')
 
     const base = parseFile(result, 'base.imljson') as Record<string, unknown>
-    // headers and log differ across modules, so they should NOT be in base
-    expect(base.headers).toBeUndefined()
+    // log differs entirely across modules, so it stays out of base
     expect(base.log).toBeUndefined()
     // baseUrl is identical, so it goes to base
     expect(base.baseUrl).toBe('https://api.example.com')
+    // headers share the Authorization key with an identical value across both modules,
+    // so that sub-key promotes to base even though the rest of the object differs
+    expect(base.headers).toEqual({ Authorization: 'Bearer {{connection.accessToken}}' })
 
     // Module APIs should preserve their own headers and log
     const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
-    expect(a1Api.headers).toEqual({ Authorization: 'Bearer {{connection.accessToken}}' })
+    // a1's only header key matched base and was stripped, leaving nothing
+    expect(a1Api.headers).toBeUndefined()
     expect(a1Api.log).toEqual({ sanitize: ['request.headers.authorization'] })
 
     const a2Api = parseFile(result, 'modules/a2/api.imljson') as Record<string, unknown>
-    expect(a2Api.headers).toEqual({
-      Authorization: 'Bearer {{connection.accessToken}}',
-      'X-Custom': 'val'
-    })
+    // a2 keeps only its module-specific header key; Authorization moved to base
+    expect(a2Api.headers).toEqual({ 'X-Custom': 'val' })
     expect(a2Api.log).toEqual({
       sanitize: ['request.headers.authorization', 'response.body']
     })
@@ -1008,6 +1007,443 @@ describe('decompileApp', () => {
     // Modules should not have headers since they match base
     const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
     expect(a1Api.headers).toBeUndefined()
+  })
+
+  function moduleAppJs(names: string[], apiFor: (name: string) => Record<string, unknown>): string {
+    const classes = names
+      .map(
+        (name) => `
+      class ${name} extends ExecuteAction {
+        constructor() {
+          super();
+          const api = ${JSON.stringify(apiFor(name))};
+          if (api) api.iml = {functions: require('./functions')};
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }`
+      )
+      .join('\n')
+    const exportsMap = names.map((n) => `${n}: ${n}`).join(', ')
+    return `${classes}\n      module.exports = { ${exportsMap} };\n`
+  }
+
+  it('dedups a shared header key across 3 modules while keeping a varying header key module-specific', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'm1', parameters: [] },
+        { name: 'm2', parameters: [] },
+        { name: 'm3', parameters: [] }
+      ]
+    }
+    const apiFor = (name: string): Record<string, unknown> => {
+      if (name === 'm1') return { url: '/m1', headers: { Authorization: 'Bearer tok', 'X-Extra': 'a' } }
+      if (name === 'm2') return { url: '/m2', headers: { Authorization: 'Bearer tok' } }
+      return { url: '/m3', headers: { Authorization: 'Bearer tok', 'X-Extra': 'b' } }
+    }
+    const appJs = moduleAppJs(['m1', 'm2', 'm3'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.headers).toEqual({ Authorization: 'Bearer tok' })
+
+    const m1Api = parseFile(result, 'modules/m1/api.imljson') as Record<string, unknown>
+    expect(m1Api.headers).toEqual({ 'X-Extra': 'a' })
+
+    // m2's only header key matched base and was stripped, leaving nothing
+    const m2Api = parseFile(result, 'modules/m2/api.imljson') as Record<string, unknown>
+    expect(m2Api.headers).toBeUndefined()
+
+    const m3Api = parseFile(result, 'modules/m3/api.imljson') as Record<string, unknown>
+    expect(m3Api.headers).toEqual({ 'X-Extra': 'b' })
+  })
+
+  it('requires universal agreement, not plurality: 2-of-3 modules sharing a qs key does not promote it to base', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'm1', parameters: [] },
+        { name: 'm2', parameters: [] },
+        { name: 'm3', parameters: [] }
+      ]
+    }
+    const apiFor = (name: string): Record<string, unknown> => {
+      if (name === 'm1') return { url: '/m1', qs: { foo: 'v' } }
+      if (name === 'm2') return { url: '/m2', qs: { foo: 'v' } }
+      return { url: '/m3', qs: { foo: 'other' } }
+    }
+    const appJs = moduleAppJs(['m1', 'm2', 'm3'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    // no field promotes anywhere, so base.imljson is never emitted
+    expect(findFile(result, 'base.imljson')).toBeUndefined()
+
+    const m1Api = parseFile(result, 'modules/m1/api.imljson') as Record<string, unknown>
+    expect(m1Api.qs).toEqual({ foo: 'v' })
+    const m2Api = parseFile(result, 'modules/m2/api.imljson') as Record<string, unknown>
+    expect(m2Api.qs).toEqual({ foo: 'v' })
+    const m3Api = parseFile(result, 'modules/m3/api.imljson') as Record<string, unknown>
+    expect(m3Api.qs).toEqual({ foo: 'other' })
+  })
+
+  it('promotes log.sanitize to base when identical across modules, stripping it from modules that match', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'a1', parameters: [] },
+        { name: 'a2', parameters: [] }
+      ]
+    }
+    const apiFor = (name: string): Record<string, unknown> => ({
+      url: `/${name}`,
+      log: { sanitize: ['request.headers.authorization'] }
+    })
+    const appJs = moduleAppJs(['a1', 'a2'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.log).toEqual({ sanitize: ['request.headers.authorization'] })
+
+    const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
+    expect(a1Api.log).toBeUndefined()
+    const a2Api = parseFile(result, 'modules/a2/api.imljson') as Record<string, unknown>
+    expect(a2Api.log).toBeUndefined()
+  })
+
+  it('promotes a composite sub-key shared by 9 of 10 modules (90% share, the relaxed floor)', () => {
+    const names = Array.from({ length: 10 }, (_, i) => `m${i}`)
+    const manifest = {
+      name: 'app',
+      actions: names.map((name) => ({ name, parameters: [] }))
+    }
+    const apiFor = (name: string): Record<string, unknown> => {
+      const i = Number(name.slice(1))
+      return { url: `/${name}`, headers: { 'X-Api-Version': i === 9 ? 'legacy' : '2023-06-01' } }
+    }
+    const appJs = moduleAppJs(names, apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.headers).toEqual({ 'X-Api-Version': '2023-06-01' })
+
+    for (let i = 0; i < 9; i++) {
+      const api = parseFile(result, `modules/m${i}/api.imljson`) as Record<string, unknown>
+      expect(api.headers).toBeUndefined()
+    }
+    const m9Api = parseFile(result, 'modules/m9/api.imljson') as Record<string, unknown>
+    expect(m9Api.headers).toEqual({ 'X-Api-Version': 'legacy' })
+  })
+
+  it('does not promote a composite sub-key shared by only 6 of 10 modules (60% share, below the 90% floor)', () => {
+    const names = Array.from({ length: 10 }, (_, i) => `m${i}`)
+    const manifest = {
+      name: 'app',
+      actions: names.map((name) => ({ name, parameters: [] }))
+    }
+    const apiFor = (name: string): Record<string, unknown> => {
+      const i = Number(name.slice(1))
+      return { url: `/${name}`, qs: { foo: i < 6 ? 'v' : `other${i}` } }
+    }
+    const appJs = moduleAppJs(names, apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = findFile(result, 'base.imljson')
+    if (base) {
+      expect((JSON.parse(base.content) as Record<string, unknown>).qs).toBeUndefined()
+    }
+
+    for (let i = 0; i < 6; i++) {
+      const api = parseFile(result, `modules/m${i}/api.imljson`) as Record<string, unknown>
+      expect(api.qs).toEqual({ foo: 'v' })
+    }
+    for (let i = 6; i < 10; i++) {
+      const api = parseFile(result, `modules/m${i}/api.imljson`) as Record<string, unknown>
+      expect(api.qs).toEqual({ foo: `other${i}` })
+    }
+  })
+
+  it('discovers a non-obvious composite field name generically (real anthropic-claude pagination shape)', () => {
+    const manifest = {
+      name: 'anthropic-claude',
+      actions: [
+        { name: 'listFiles', parameters: [] },
+        { name: 'listSkills', parameters: [] },
+        { name: 'listSkillVersions', parameters: [] }
+      ]
+    }
+    const pagination = { condition: '{{body.has_more}}' }
+    const apiFor = (name: string): Record<string, unknown> => ({ url: `/${name}`, pagination: { ...pagination } })
+    const appJs = moduleAppJs(['listFiles', 'listSkills', 'listSkillVersions'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'anthropic-claude')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.pagination).toEqual(pagination)
+
+    const listFilesApi = parseFile(result, 'modules/listFiles/api.imljson') as Record<string, unknown>
+    expect(listFilesApi.pagination).toBeUndefined()
+    const listSkillsApi = parseFile(result, 'modules/listSkills/api.imljson') as Record<string, unknown>
+    expect(listSkillsApi.pagination).toBeUndefined()
+  })
+
+  it('scalars (baseUrl, timeout) still promote/strip via the simple atomic path', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'm1', parameters: [] },
+        { name: 'm2', parameters: [] }
+      ]
+    }
+    const apiFor = (name: string): Record<string, unknown> => ({
+      url: `/${name}`,
+      baseUrl: 'https://api.example.com',
+      timeout: 30000
+    })
+    const appJs = moduleAppJs(['m1', 'm2'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.baseUrl).toBe('https://api.example.com')
+    expect(base.timeout).toBe(30000)
+
+    const m1Api = parseFile(result, 'modules/m1/api.imljson') as Record<string, unknown>
+    expect(m1Api.baseUrl).toBeUndefined()
+    expect(m1Api.timeout).toBeUndefined()
+  })
+
+  it('does not run response through the generic composite-field path (dedicated handling only touches response.error/temp)', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'm1', parameters: [] },
+        { name: 'm2', parameters: [] }
+      ]
+    }
+    // response.output is identical across both modules but is not response.error/temp,
+    // so the dedicated response handler must NOT promote it to base
+    const apiFor = (name: string): Record<string, unknown> => ({
+      url: `/${name}`,
+      response: { output: '{{body}}' }
+    })
+    const appJs = moduleAppJs(['m1', 'm2'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    // response.output never goes through dedicated extraction, so nothing promotes
+    expect(findFile(result, 'base.imljson')).toBeUndefined()
+
+    const m1Api = parseFile(result, 'modules/m1/api.imljson') as Record<string, unknown>
+    expect((m1Api.response as Record<string, unknown>).output).toBe('{{body}}')
+    const m2Api = parseFile(result, 'modules/m2/api.imljson') as Record<string, unknown>
+    expect((m2Api.response as Record<string, unknown>).output).toBe('{{body}}')
+  })
+
+  it('minority-coverage composite field never promotes to base, even with perfect internal agreement (gate 1)', () => {
+    const names = Array.from({ length: 10 }, (_, i) => `m${i}`)
+    const manifest = {
+      name: 'app',
+      actions: names.map((name) => ({ name, parameters: [] }))
+    }
+    const pagination = { condition: '{{body.has_more}}' }
+    const apiFor = (name: string): Record<string, unknown> => {
+      if (name === 'm0' || name === 'm1') return { url: `/${name}`, pagination: { ...pagination } }
+      return { url: `/${name}` }
+    }
+    const appJs = moduleAppJs(names, apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = findFile(result, 'base.imljson')
+    if (base) {
+      expect((JSON.parse(base.content) as Record<string, unknown>).pagination).toBeUndefined()
+    }
+
+    const m0Api = parseFile(result, 'modules/m0/api.imljson') as Record<string, unknown>
+    expect(m0Api.pagination).toEqual(pagination)
+    const m1Api = parseFile(result, 'modules/m1/api.imljson') as Record<string, unknown>
+    expect(m1Api.pagination).toEqual(pagination)
+    for (const name of names.slice(2)) {
+      const api = parseFile(result, `modules/${name}/api.imljson`) as Record<string, unknown>
+      expect(api.pagination).toBeUndefined()
+    }
+  })
+
+  it('scalar field promotes at real-world plurality share (5 of 10 modules agreeing) while others keep their own value', () => {
+    const names = Array.from({ length: 10 }, (_, i) => `m${i}`)
+    const manifest = {
+      name: 'app',
+      actions: names.map((name) => ({ name, parameters: [] }))
+    }
+    const bodyFor = (i: number): string => {
+      if (i < 5) return 'template-A'
+      if (i < 8) return 'template-B'
+      return 'template-C'
+    }
+    const apiFor = (name: string): Record<string, unknown> => {
+      const i = Number(name.slice(1))
+      return { url: `/${name}`, body: bodyFor(i) }
+    }
+    const appJs = moduleAppJs(names, apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.body).toBe('template-A')
+
+    for (let i = 0; i < 5; i++) {
+      const api = parseFile(result, `modules/m${i}/api.imljson`) as Record<string, unknown>
+      expect(api.body).toBeUndefined()
+    }
+    for (let i = 5; i < 8; i++) {
+      const api = parseFile(result, `modules/m${i}/api.imljson`) as Record<string, unknown>
+      expect(api.body).toBe('template-B')
+    }
+    for (let i = 8; i < 10; i++) {
+      const api = parseFile(result, `modules/m${i}/api.imljson`) as Record<string, unknown>
+      expect(api.body).toBe('template-C')
+    }
+  })
+
+  it('extracts response.valid to base when identical across all modules', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'a1', parameters: [] },
+        { name: 'a2', parameters: [] }
+      ]
+    }
+    const apiFor = (name: string): Record<string, unknown> => ({
+      url: `/${name}`,
+      response: { valid: '{{statusCode < 400}}' }
+    })
+    const appJs = moduleAppJs(['a1', 'a2'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect((base.response as Record<string, unknown>).valid).toBe('{{statusCode < 400}}')
+
+    const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
+    expect(a1Api.response).toBeUndefined()
+  })
+
+  it('promotes a shared scalar body template to base (shopify shape)', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        { name: 'a1', parameters: [] },
+        { name: 'a2', parameters: [] }
+      ]
+    }
+    const apiFor = (name: string): Record<string, unknown> => ({
+      url: `/${name}`,
+      body: '{{parameters}}'
+    })
+    const appJs = moduleAppJs(['a1', 'a2'], apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = parseFile(result, 'base.imljson') as Record<string, unknown>
+    expect(base.body).toBe('{{parameters}}')
+
+    const a1Api = parseFile(result, 'modules/a1/api.imljson') as Record<string, unknown>
+    expect(a1Api.body).toBeUndefined()
+  })
+
+  it('does not promote a minority object-shaped body, and it is never double-processed by the composite path (anthropic-claude shape)', () => {
+    const names = Array.from({ length: 10 }, (_, i) => `m${i}`)
+    const manifest = {
+      name: 'app',
+      actions: names.map((name) => ({ name, parameters: [] }))
+    }
+    const apiFor = (name: string): Record<string, unknown> => {
+      if (name === 'm0' || name === 'm1') return { url: `/${name}`, body: { model: name } }
+      return { url: `/${name}` }
+    }
+    const appJs = moduleAppJs(names, apiFor)
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const base = findFile(result, 'base.imljson')
+    if (base) {
+      expect((JSON.parse(base.content) as Record<string, unknown>).body).toBeUndefined()
+    }
+
+    const m0Api = parseFile(result, 'modules/m0/api.imljson') as Record<string, unknown>
+    expect(m0Api.body).toEqual({ model: 'm0' })
+    const m1Api = parseFile(result, 'modules/m1/api.imljson') as Record<string, unknown>
+    expect(m1Api.body).toEqual({ model: 'm1' })
+  })
+
+  it('decompiles successfully when module.exports carries an ENDPOINTS entry assigned via require(...)', () => {
+    const manifest = {
+      name: 'app',
+      actions: [{ name: 'someModule', parameters: [] }]
+    }
+    const appJs = `
+      class SomeModule extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/test' };
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { someModule: SomeModule, ENDPOINTS: require('./endpoints') };
+    `
+    const files: ExtractedFile[] = [
+      { path: 'manifest.json', content: JSON.stringify(manifest) },
+      { path: 'lib/app.js', content: appJs }
+    ]
+    const result = decompileApp(files, 'app')
+
+    const api = parseFile(result, 'modules/someModule/api.imljson') as Record<string, unknown>
+    expect(api.url).toBe('/test')
+    expect(findFile(result, 'modules/someModule/api.imljson')).toBeDefined()
   })
 })
 
@@ -1155,5 +1591,39 @@ describe('decompileHook', () => {
 
     const meta = parseFile(result, 'metadata.json') as Record<string, unknown>
     expect(meta.connection).toBeNull()
+  })
+})
+
+// ---- ENDPOINTS export carve-out (decompiler-sandbox) ----
+
+describe('parseCompiledJs ENDPOINTS carve-out', () => {
+  it('skips an ENDPOINTS export assigned via require(...) instead of throwing', () => {
+    const appJs = `
+      class SomeModule extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/test' };
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { someModule: SomeModule, ENDPOINTS: require('./endpoints') };
+    `
+    const result = parseCompiledJs(appJs)
+    expect((result.someModule as Record<string, unknown>).url).toBe('/test')
+    expect(result.ENDPOINTS).toBeUndefined()
+  })
+
+  it('still throws for an unrelated unsupported export shape (carve-out is narrow, not a blanket error swallow)', () => {
+    const appJs = `
+      class SomeModule extends ExecuteAction {
+        constructor() {
+          super();
+          const api = { url: '/test' };
+          Object.defineProperty(this, 'api', {get: () => api, set: () => null});
+        }
+      }
+      module.exports = { someModule: SomeModule, otherExport: require('./other') };
+    `
+    expect(() => parseCompiledJs(appJs)).toThrow('unsupported export value for otherExport')
   })
 })
