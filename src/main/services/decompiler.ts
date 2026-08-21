@@ -165,8 +165,11 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
     // expect.imljson — only for actions/searches (not triggers)
     const params = mod.rawItem.parameters as unknown[] | undefined
     if (!isInstantTrigger && mod.type !== 'trigger') {
-      let expect: unknown = []
-      if (params && params.length > 0) {
+      // rawItem.expect wins only if a non-empty array; else falls through to __IMTCONN__ nested.store, else []
+      const rawExpect = mod.rawItem.expect
+      const hasRawExpect = Array.isArray(rawExpect) && rawExpect.length > 0
+      let expect: unknown = hasRawExpect ? rawExpect : []
+      if (!hasRawExpect && params && params.length > 0) {
         const fp = params[0] as Record<string, unknown> | undefined
         if (fp?.name === '__IMTCONN__') {
           const options = fp.options as Record<string, unknown> | undefined

@@ -368,6 +368,215 @@ describe('decompileApp', () => {
     expect(ifaceFile.content).not.toContain('rpc://my-app@2/')
   })
 
+  it('reads expect.imljson from top-level rawItem.expect', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        {
+          name: 'act',
+          parameters: [],
+          expect: [{ name: 'text', type: 'text', label: 'Text' }]
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    const expectData = parseFile(result, 'modules/act/expect.imljson')
+    expect(expectData).toEqual([{ name: 'text', type: 'text', label: 'Text' }])
+  })
+
+  it('prefers rawItem.expect over __IMTCONN__ nested.store when both present', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        {
+          name: 'act',
+          parameters: [
+            {
+              name: '__IMTCONN__',
+              type: 'account:conn',
+              options: { nested: { store: [{ name: 'fromNestedStore', type: 'text' }] } }
+            }
+          ],
+          expect: [{ name: 'fromRawExpect', type: 'text' }]
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    const expectFile = findFile(result, 'modules/act/expect.imljson')!
+    expect(expectFile.content).toContain('fromRawExpect')
+    expect(expectFile.content).not.toContain('fromNestedStore')
+  })
+
+  it('falls back to __IMTCONN__ nested.store when rawItem.expect is absent', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        {
+          name: 'act',
+          parameters: [
+            {
+              name: '__IMTCONN__',
+              type: 'account:conn',
+              options: { nested: { store: [{ name: 'fromNestedStore', type: 'text' }] } }
+            }
+          ]
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    const expectData = parseFile(result, 'modules/act/expect.imljson')
+    expect(expectData).toEqual([{ name: 'fromNestedStore', type: 'text' }])
+  })
+
+  it('falls back to __IMTCONN__ nested.store when rawItem.expect is an empty array', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        {
+          name: 'act',
+          parameters: [
+            {
+              name: '__IMTCONN__',
+              type: 'account:conn',
+              options: { nested: { store: [{ name: 'fromNestedStore', type: 'text' }] } }
+            }
+          ],
+          expect: []
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    const expectData = parseFile(result, 'modules/act/expect.imljson')
+    expect(expectData).toEqual([{ name: 'fromNestedStore', type: 'text' }])
+  })
+
+  it.each([
+    ['object', { foo: 'bar' }],
+    ['string', 'not-an-array']
+  ])('falls through to nested store when rawItem.expect is a non-array (%s)', (_label, expectValue) => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        {
+          name: 'act',
+          parameters: [
+            {
+              name: '__IMTCONN__',
+              type: 'account:conn',
+              options: { nested: { store: [{ name: 'fromNestedStore', type: 'text' }] } }
+            }
+          ],
+          expect: expectValue
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    const expectData = parseFile(result, 'modules/act/expect.imljson')
+    expect(expectData).toEqual([{ name: 'fromNestedStore', type: 'text' }])
+  })
+
+  it('resolves to an empty array when rawItem.expect is non-array and no nested store exists', () => {
+    const manifest = {
+      name: 'app',
+      actions: [
+        {
+          name: 'act',
+          parameters: [],
+          expect: { foo: 'bar' }
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    const expectData = parseFile(result, 'modules/act/expect.imljson')
+    expect(expectData).toEqual([])
+  })
+
+  it('resolves the dominant anthropic-claude shape: empty top-level expect with fields in __IMTCONN__ nested.store', () => {
+    const manifest = {
+      name: 'anthropic-claude',
+      actions: [
+        {
+          name: 'createAMessage',
+          parameters: [
+            {
+              name: '__IMTCONN__',
+              type: 'account:conn',
+              options: {
+                nested: {
+                  store: [
+                    { name: 'model', type: 'select' },
+                    { name: 'maxTokens', type: 'number' },
+                    { name: 'messages', type: 'array' }
+                  ]
+                }
+              }
+            }
+          ],
+          expect: []
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'anthropic-claude')
+
+    const expectData = parseFile(result, 'modules/createAMessage/expect.imljson') as Record<string, unknown>[]
+    expect(expectData.map((f) => f.name)).toEqual(['model', 'maxTokens', 'messages'])
+  })
+
+  it('transforms RPC references in a top-level rawItem.expect field', () => {
+    const manifest = {
+      name: 'anthropic-claude',
+      actions: [
+        {
+          name: 'simpleTextPrompt',
+          parameters: [],
+          expect: [
+            {
+              name: 'model',
+              type: 'select',
+              options: { store: 'rpc://anthropic-claude@1/getTextPromptField' }
+            }
+          ]
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'anthropic-claude')
+
+    const expectFile = findFile(result, 'modules/simpleTextPrompt/expect.imljson')!
+    expect(expectFile.content).toContain('rpc://getTextPromptField')
+    expect(expectFile.content).not.toContain('rpc://anthropic-claude@1/')
+  })
+
+  it('does not emit expect.imljson for trigger modules even when rawItem.expect is present', () => {
+    const manifest = {
+      name: 'app',
+      triggers: [
+        {
+          name: 'trg',
+          parameters: [],
+          expect: [{ name: 'field', type: 'text' }]
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    expect(findFile(result, 'modules/trg/expect.imljson')).toBeUndefined()
+  })
+
   it('parses lib/rpc.js into rpcs/ directory', () => {
     const manifest = { name: 'app' }
     const rpcJs = `
