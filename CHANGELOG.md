@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.3](https://github.com/minsu-kang/make-app-diff/compare/v1.5.2...v1.5.3) (2026-08-21)
+
+
+### Bug Fixes
+
+* read top-level expect field before falling back to __IMTCONN__ store ([376b174](https://github.com/minsu-kang/make-app-diff/commit/376b17468c29e3726c741850cb6842bdb8e06ba8))
+* read top-level expect field before falling back to __IMTCONN__ store ([921fadd](https://github.com/minsu-kang/make-app-diff/commit/921faddce9336f0ff67c14f51e758127dc216267))
+
 ## [1.5.2](https://github.com/minsu-kang/make-app-diff/compare/v1.5.1...v1.5.2) (2026-03-24)
 
 
