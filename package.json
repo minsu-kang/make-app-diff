@@ -21,7 +21,7 @@
     "@monaco-editor/react": "4.7.0",
     "acorn": "8.16.0",
     "archiver": "7.0.1",
-    "axios": "1.18.0",
+    "axios": "1.20.0",
     "diff": "5.2.2",
     "electron-store": "8.2.0",
     "monaco-editor": "0.55.1",
@@ -36,7 +36,7 @@
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "4.7.0",
     "@vitest/coverage-v8": "4.0.18",
-    "electron": "43.4.1",
+    "electron": "43.7.9",
     "electron-builder": "26.15.3",
     "electron-vite": "2.3.0",
     "eslint": "9.39.4",
@@ -48,8 +48,8 @@
     "react-dom": "18.3.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.56.1",
-    "vite": "5.4.21",
-    "vitest": "4.0.18"
+    "vite": "8.3.3",
+    "vitest": "5.0.3"
   },
   "build": {
     "appId": "com.make.app-diff",
