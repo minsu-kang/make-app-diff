@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: make-app-diff
+  annotations:
+    github.com/project-slug: integromat/make-app-diff
+spec:
+  type: library
+  lifecycle: internal
+  owner: group:default/athena
+  partOfCoreProduct: false

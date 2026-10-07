@@ -341,6 +341,4 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 
 **Update check:** App checks GitHub API (`/repos/{owner}/{repo}/releases/latest`) on startup and via File > Check for Updates. Shows dismissible banner with link to download. Response is cached with 5-minute TTL to avoid rate limits. Rate limit (403 + `x-ratelimit-remaining: 0`) shows specific error message.
 
-**External integrations:**
-- CodeRabbit (`.coderabbit.yaml`) — AI code review on PRs
-- CODEOWNERS — `@minsu-kang` owns all files
+**Ownership:** Repository access and CODEOWNERS are declared in mono (`libs/github-resources`, owner: athena team). Do not add a root `CODEOWNERS` file.
