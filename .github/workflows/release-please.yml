@@ -22,7 +22,7 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
 
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
         with:
           release-type: node
@@ -37,11 +37,11 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.tag_name || needs.release-please.outputs.tag_name }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: npm
@@ -55,7 +55,7 @@ jobs:
         run: npx electron-builder --mac dmg --publish never
 
       - name: Upload DMG to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ inputs.tag_name || needs.release-please.outputs.tag_name }}
           files: dist/*.dmg
@@ -69,11 +69,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.tag_name || needs.release-please.outputs.tag_name }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: npm
@@ -87,47 +87,7 @@ jobs:
         run: npx electron-builder --win --publish never
 
       - name: Upload EXE to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ inputs.tag_name || needs.release-please.outputs.tag_name }}
           files: dist/*.exe
-
-  update-homebrew:
-    needs: [release-please, build-mac]
-    if: ${{ needs.build-mac.result == 'success' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Get version from tag
-        id: version
-        run: |
-          TAG="${{ inputs.tag_name || needs.release-please.outputs.tag_name }}"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Download DMG and compute SHA256
-        id: sha
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          curl -sL -o makediff.dmg "https://github.com/minsu-kang/make-app-diff/releases/download/v${VERSION}/MakeDiff-${VERSION}-arm64.dmg"
-          SHA=$(sha256sum makediff.dmg | awk '{print $1}')
-          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
-
-      - name: Update Homebrew Cask formula
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          SHA="${{ steps.sha.outputs.sha256 }}"
-
-          git clone https://x-access-token:${GH_TOKEN}@github.com/minsu-kang/homebrew-makediff.git
-          cd homebrew-makediff
-
-          sed -i "s/version \".*\"/version \"${VERSION}\"/" Casks/makediff.rb
-          sed -i "s/sha256 \".*\"/sha256 \"${SHA}\"/" Casks/makediff.rb
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/makediff.rb
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "chore: update MakeDiff to v${VERSION}"
-          git push
