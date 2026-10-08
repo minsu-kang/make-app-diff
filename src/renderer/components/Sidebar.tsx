@@ -7,9 +7,10 @@ interface SidebarProps {
   onSettingsClick: () => void
   appIcon?: string | null
   appTheme?: string | null
+  refreshKey?: number
 }
 
-export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appTheme }: SidebarProps) {
+export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appTheme, refreshKey }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [allApps, setAllApps] = useState<SearchApp[]>([])
   const [loadingApps, setLoadingApps] = useState(false)
@@ -45,16 +46,26 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     setLoadingApps(true)
+    setError(null)
     window.api.ipm
       .searchApps()
       .then((result) => {
+        if (cancelled) return
         if (result.success && result.data) {
           setAllApps(result.data)
+        } else {
+          setError(result.error || 'Failed to load apps')
         }
       })
-      .finally(() => setLoadingApps(false))
-  }, [])
+      .finally(() => {
+        if (!cancelled) setLoadingApps(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
 
   const filteredEntries = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()

@@ -4,6 +4,7 @@ import { showToast } from './Toast'
 
 interface SettingsProps {
   onClose: () => void
+  onSaved?: () => void
   forced?: boolean
 }
 
@@ -13,7 +14,7 @@ const themeOptions = [
   { value: 'light', label: 'Light', bg: '#ffffff', accent: '#0071e3' }
 ]
 
-export default function Settings({ onClose, forced }: SettingsProps) {
+export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
   const [settings, setSettings] = useState<IpmSettings>({
     host: 'ipme.integromat.com',
     ipmToken: '',
@@ -89,6 +90,7 @@ export default function Settings({ onClose, forced }: SettingsProps) {
       if (result.success) {
         await window.api.theme.save(theme)
         showToast('Settings saved', 'success')
+        onSaved?.()
         onClose()
       } else {
         setError(result.error || 'Connection failed')
