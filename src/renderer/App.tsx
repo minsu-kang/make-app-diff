@@ -46,24 +46,6 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [viewMode, setViewMode] = useState<'diff' | 'show'>('diff')
   const [decompile, setDecompile] = useState(true)
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
-
-  useEffect(() => {
-    const cleanupAvailable = window.api.update.onAvailable((version) => {
-      setUpdateVersion(version)
-    })
-    const cleanupUpToDate = window.api.update.onUpToDate(() => {
-      showToast('You are on the latest version', 'success')
-    })
-    const cleanupError = window.api.update.onError((message) => {
-      showToast(message || 'Could not check for updates', 'error')
-    })
-    return () => {
-      cleanupAvailable()
-      cleanupUpToDate()
-      cleanupError()
-    }
-  }, [])
 
   useEffect(() => {
     const cleanupSettings = window.onMenu.openSettings(() => setShowSettings(true))
@@ -260,30 +242,6 @@ export default function App() {
       )}
 
       <main className="main-content">
-        {updateVersion && (
-          <div className="update-banner">
-            <span>v{updateVersion} available</span>
-            <button className="update-banner-btn" onClick={() => window.api.update.openRelease(updateVersion!)}>
-              Download
-            </button>
-            {navigator.userAgent.includes('Mac') && (
-              <button
-                className="update-banner-btn update-banner-brew"
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    'osascript -e \'quit app "MakeDiff"\' && brew update && brew upgrade --cask makediff && open -a MakeDiff'
-                  )
-                  showToast('Copied to clipboard', 'success')
-                }}
-              >
-                brew upgrade
-              </button>
-            )}
-            <button className="update-banner-dismiss" onClick={() => setUpdateVersion(null)}>
-              &#10005;
-            </button>
-          </div>
-        )}
         <div className="main-top-bar">
           <button
             className="sidebar-toggle"

@@ -1,14 +1,9 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import axios from 'axios'
 import { registerIpcHandlers } from './ipc-handlers'
 
-const REPO_OWNER = 'minsu-kang'
-const REPO_NAME = 'make-app-diff'
-const UPDATE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
-
-let updateCache: { version: string; timestamp: number } | null = null
+const RELEASES_URL = 'https://github.com/integromat/make-app-diff/releases'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -34,51 +29,11 @@ function createWindow(): void {
   })
 
   buildMenu(mainWindow)
-  checkForUpdates(mainWindow)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-}
-
-export async function checkForUpdates(mainWindow: BrowserWindow, manual = false): Promise<void> {
-  // Use cached response if still fresh
-  if (updateCache && Date.now() - updateCache.timestamp < UPDATE_CACHE_TTL) {
-    const current = app.getVersion()
-    if (updateCache.version !== current) {
-      mainWindow.webContents.send('update:available', updateCache.version)
-    } else if (manual) {
-      mainWindow.webContents.send('update:up-to-date')
-    }
-    return
-  }
-
-  try {
-    const { data } = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github.v3+json' },
-      timeout: 10000
-    })
-    const latest = (data.tag_name as string).replace(/^v/, '')
-    updateCache = { version: latest, timestamp: Date.now() }
-    const current = app.getVersion()
-    if (latest !== current) {
-      mainWindow.webContents.send('update:available', latest)
-    } else if (manual) {
-      mainWindow.webContents.send('update:up-to-date')
-    }
-  } catch (error: unknown) {
-    if (manual) {
-      const isRateLimit =
-        axios.isAxiosError(error) &&
-        error.response?.status === 403 &&
-        error.response?.headers?.['x-ratelimit-remaining'] === '0'
-      const message = isRateLimit
-        ? 'GitHub API rate limit exceeded. Please try again later.'
-        : 'Could not check for updates'
-      mainWindow.webContents.send('update:error', message)
-    }
   }
 }
 
@@ -113,8 +68,8 @@ function buildMenu(mainWindow: BrowserWindow): void {
         },
         { type: 'separator' },
         {
-          label: 'Check for Updates',
-          click: () => checkForUpdates(mainWindow, true)
+          label: 'Open Releases Page',
+          click: () => shell.openExternal(RELEASES_URL)
         },
         { type: 'separator' },
         process.platform === 'darwin' ? { role: 'close' } : { role: 'quit' }

@@ -76,25 +76,6 @@ const api = {
     add: (name: string, label: string, major: number): Promise<IpcResult<RecentApp[]>> =>
       ipcRenderer.invoke('recent:add', name, label, major)
   },
-  update: {
-    check: (): Promise<IpcResult<void>> => ipcRenderer.invoke('update:check'),
-    openRelease: (version: string): Promise<IpcResult<void>> => ipcRenderer.invoke('update:open-release', version),
-    onAvailable: (cb: (version: string) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, version: string) => cb(version)
-      ipcRenderer.on('update:available', handler)
-      return () => ipcRenderer.removeListener('update:available', handler)
-    },
-    onUpToDate: (cb: () => void) => {
-      const handler = () => cb()
-      ipcRenderer.on('update:up-to-date', handler)
-      return () => ipcRenderer.removeListener('update:up-to-date', handler)
-    },
-    onError: (cb: (message?: string) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, message?: string) => cb(message)
-      ipcRenderer.on('update:error', handler)
-      return () => ipcRenderer.removeListener('update:error', handler)
-    }
-  },
   ipm: {
     searchApps: (): Promise<IpcResult<SearchAppResult[]>> => ipcRenderer.invoke('ipm:search-apps'),
     getAppInfo: (appName: string, version?: string): Promise<IpcResult<AppInfo>> =>

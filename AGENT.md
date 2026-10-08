@@ -77,16 +77,12 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 | `recent:add` | `name, label, major` | `IpcResult<RecentApp[]>` |
 | `editor:open-diff` | `{ filePath, fromVersion, toVersion, oldContent, newContent }` | `IpcResult<void>` |
 | `clipboard:copy-zip` | `{ appName, version, files: {path,content}[] }` | `IpcResult<string>` (zip path) |
-| `update:check` | — | `IpcResult<void>` |
-| `update:open-release` | `version` | `IpcResult<void>` (opens browser) |
 
 **Menu events:** `menu:download-app`, `menu:open-settings`, `menu:show-info`
 
-**Renderer events (main → renderer):** `update:available` (version string), `update:up-to-date`, `update:error` (message? string)
-
 ## Preload Exposed Objects
 
-- `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `update`, `editor`, `clipboard`, `showInFinder` namespaces)
+- `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `editor`, `clipboard`, `showInFinder` namespaces)
 - `window.appVersion` — `{ app, electron, chrome, node }`
 - `window.onMenu` — `{ downloadApp, openSettings, showInfo }` callback registration (each returns cleanup function)
 
@@ -188,7 +184,6 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - `.media-*` for image previews
 - `.app-*` for app info/icon elements
 - `.empty-state-*` for landing page
-- `.update-*` for update notification banner
 
 **Rules:**
 - Global CSS only (no CSS modules)
@@ -315,7 +310,6 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 |---------|-------|---------|
 | Window frame | `hiddenInset` + custom traffic light position | Default system frame |
 | Clipboard copy ZIP | `NSFilenamesPboardType` plist buffer | PowerShell `Clipboard.SetFileDropList()` (`CF_HDROP`) |
-| Update download URL | `MakeDiff-{ver}-{arm64\|x64}.dmg` | `MakeDiff.Setup.{ver}.exe` |
 | App quit on all windows closed | No (stays in dock) | Yes (`app.quit()`) |
 
 ## Temp Files
@@ -339,6 +333,6 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 2. Merge Release PR → GitHub Release created → `build-mac` + `build-win` jobs run in parallel
 3. DMG + EXE uploaded to Release assets
 
-**Update check:** App checks GitHub API (`/repos/{owner}/{repo}/releases/latest`) on startup and via File > Check for Updates. Shows dismissible banner with link to download. Response is cached with 5-minute TTL to avoid rate limits. Rate limit (403 + `x-ratelimit-remaining: 0`) shows specific error message.
+**Updates:** There is no in-app update check. File > Open Releases Page opens the Releases page in the browser, and releases are installed manually.
 
 **Ownership:** Repository access and CODEOWNERS are declared in mono (`libs/github-resources`, owner: athena team). Do not add a root `CODEOWNERS` file.
