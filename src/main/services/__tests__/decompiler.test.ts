@@ -172,6 +172,48 @@ describe('decompileApp', () => {
     expect(params).toEqual([{ name: 'param1', type: 'text' }])
   })
 
+  it('takes regular trigger parameters from __IMTCONN__ options.nested', () => {
+    const manifest = {
+      name: 'app',
+      triggers: [
+        {
+          name: 'trg',
+          parameters: [
+            {
+              name: '__IMTCONN__',
+              type: 'account:my-account',
+              options: { nested: [{ name: 'param1', type: 'text' }] }
+            }
+          ]
+        }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    expect((parseFile(result, 'modules/trg/metadata.json') as Record<string, unknown>).type).toBe('trigger')
+    expect(parseFile(result, 'modules/trg/parameters.imljson')).toEqual([{ name: 'param1', type: 'text' }])
+  })
+
+  it.each([
+    ['an empty array', []],
+    ['an object', { store: [] }],
+    ['missing', undefined]
+  ])('uses empty trigger parameters when options.nested is %s', (_label, nested) => {
+    const manifest = {
+      name: 'app',
+      triggers: [
+        { name: 'trg', parameters: [{ name: '__IMTCONN__', type: 'account:acc', options: { nested } }] },
+        { name: 'hookTrigger', parameters: [{ name: '__IMTHOOK__', type: 'hook:h', options: { nested } }] }
+      ]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileApp(files, 'app')
+
+    expect(parseFile(result, 'modules/trg/parameters.imljson')).toEqual([])
+    expect(parseFile(result, 'modules/hookTrigger/parameters.imljson')).toEqual([])
+  })
+
   it('parses lib/app.js (real const api = <literal> + Object.defineProperty idiom) into module api.imljson', () => {
     const manifest = {
       name: 'app',
@@ -1735,6 +1777,23 @@ describe('decompileHook', () => {
 
     const api = parseFile(result, 'api.imljson') as Record<string, unknown>
     expect(api.url).toBe('/webhook')
+  })
+
+  it.each([
+    ['an empty array', []],
+    ['an object', { store: [] }],
+    ['missing', undefined]
+  ])('uses empty parameters when __IMTCONN__ options.nested is %s', (_label, nested) => {
+    const manifest = {
+      name: 'hook',
+      label: 'Hook',
+      type: 'web',
+      parameters: [{ name: '__IMTCONN__', type: 'account:my-conn', options: { nested } }]
+    }
+    const files: ExtractedFile[] = [{ path: 'manifest.json', content: JSON.stringify(manifest) }]
+    const result = decompileHook(files)
+
+    expect(parseFile(result, 'parameters.imljson')).toEqual([])
   })
 
   it('defaults to null connection when no __IMTCONN__', () => {

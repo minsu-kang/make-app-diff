@@ -46,8 +46,9 @@ export default function VersionTimeline({
     const map = new Map<number, string[]>()
     for (const v of sorted) {
       const major = parseInt(v.split('.')[0], 10)
-      if (!map.has(major)) map.set(major, [])
-      map.get(major)!.push(v)
+      const group = map.get(major)
+      if (group) group.push(v)
+      else map.set(major, [v])
     }
     return map
   }, [sorted])

@@ -88,16 +88,17 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
       const majorGroups = new Map<number, string[]>()
       for (const v of app.availableVersions) {
         const major = getMajor(v)
-        if (!majorGroups.has(major)) majorGroups.set(major, [])
-        majorGroups.get(major)!.push(v)
+        const group = majorGroups.get(major)
+        if (group) group.push(v)
+        else majorGroups.set(major, [v])
       }
 
       if (majorGroups.size <= 1) {
         entries.push({ app, major: getMajor(app.version), versions: app.availableVersions })
       } else {
-        const sortedMajors = [...majorGroups.keys()].sort((a, b) => b - a)
-        for (const major of sortedMajors) {
-          entries.push({ app, major, versions: majorGroups.get(major)! })
+        const sortedGroups = [...majorGroups.entries()].sort(([a], [b]) => b - a)
+        for (const [major, versions] of sortedGroups) {
+          entries.push({ app, major, versions })
         }
       }
     }

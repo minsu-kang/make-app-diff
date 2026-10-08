@@ -213,6 +213,17 @@ describe('computeDiff', () => {
       expect(result.summary.unchanged).toBe(1)
     })
 
+    it('puts keys missing from the schema order after the ordered ones, alphabetically', () => {
+      const oldObj = { response: { zeta: 1, type: 'json', alpha: 2 } }
+      const newObj = { response: { alpha: 3, zeta: 1, type: 'json' } }
+      const oldFiles: ExtractedFile[] = [{ path: 'api.imljson', content: JSON.stringify(oldObj, null, 4) }]
+      const newFiles: ExtractedFile[] = [{ path: 'api.imljson', content: JSON.stringify(newObj, null, 4) }]
+      const { unifiedDiff } = computeDiff('app', oldFiles, newFiles).diffs[0]
+      expect(unifiedDiff.indexOf('"type"')).toBeGreaterThan(-1)
+      expect(unifiedDiff.indexOf('"type"')).toBeLessThan(unifiedDiff.indexOf('"alpha"'))
+      expect(unifiedDiff.indexOf('"alpha"')).toBeLessThan(unifiedDiff.indexOf('"zeta"'))
+    })
+
     it('sorts arrays of objects recursively', () => {
       const obj1 = [
         { method: 'POST', url: '/a' },

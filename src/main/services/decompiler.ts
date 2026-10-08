@@ -226,8 +226,9 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
         const fp = params[0] as Record<string, unknown> | undefined
         if (fp?.name === '__IMTHOOK__') {
           const options = fp.options as Record<string, unknown> | undefined
-          if (Array.isArray(options?.nested) && (options!.nested as unknown[]).length > 0) {
-            triggerParams = options!.nested
+          const nested = options?.nested
+          if (Array.isArray(nested) && nested.length > 0) {
+            triggerParams = nested
           }
         }
       }
@@ -239,8 +240,9 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
         const fp = params[0] as Record<string, unknown> | undefined
         if (fp?.name === '__IMTCONN__') {
           const options = fp.options as Record<string, unknown> | undefined
-          if (Array.isArray(options?.nested) && (options!.nested as unknown[]).length > 0) {
-            triggerParams = options!.nested
+          const nested = options?.nested
+          if (Array.isArray(nested) && nested.length > 0) {
+            triggerParams = nested
           }
         }
       }
@@ -287,7 +289,7 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
   }
 
   // Collect webhook names from instant_trigger modules
-  const webhookNames = new Set(modules.filter((m) => m.webhook).map((m) => m.webhook!))
+  const webhookNames = new Set(modules.flatMap((m) => (m.webhook ? [m.webhook] : [])))
 
   // Generate RPC files
   for (const [name, api] of Object.entries(rpcApis)) {
@@ -432,8 +434,9 @@ function doDecompileHook(files: ExtractedFile[]): ExtractedFile[] {
   let params: unknown = []
   if (firstParam?.name === '__IMTCONN__') {
     const options = firstParam.options as Record<string, unknown> | undefined
-    if (Array.isArray(options?.nested) && (options!.nested as unknown[]).length > 0) {
-      params = options!.nested
+    const nested = options?.nested
+    if (Array.isArray(nested) && nested.length > 0) {
+      params = nested
     }
   }
   result.push(makeFile('parameters.imljson', params))

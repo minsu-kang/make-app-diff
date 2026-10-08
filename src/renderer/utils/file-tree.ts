@@ -26,15 +26,12 @@ export function buildTree(diffs: FileDiff[]): TreeNode {
     let node = root
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i]
-      if (!node.children.has(part)) {
-        node.children.set(part, {
-          name: part,
-          fullPath: parts.slice(0, i + 1).join('/'),
-          children: new Map(),
-          file: null
-        })
+      let child = node.children.get(part)
+      if (!child) {
+        child = { name: part, fullPath: parts.slice(0, i + 1).join('/'), children: new Map(), file: null }
+        node.children.set(part, child)
       }
-      node = node.children.get(part)!
+      node = child
       if (i === parts.length - 1) node.file = diff
     }
   }

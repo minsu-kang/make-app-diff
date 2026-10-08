@@ -253,9 +253,7 @@ export default function App() {
 
   const handleOpenVscode = useCallback(async () => {
     if (!appInfo || !diffResult || !toVersion) return
-    const files = diffResult.diffs
-      .filter((d) => d.newContent)
-      .map((d) => ({ path: d.filePath, content: d.newContent! }))
+    const files = diffResult.diffs.flatMap((d) => (d.newContent ? [{ path: d.filePath, content: d.newContent }] : []))
     try {
       const result = await window.api.editor.openInVscode({
         appName: appInfo.name,

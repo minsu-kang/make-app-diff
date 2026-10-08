@@ -61,8 +61,8 @@ function sortKeysRecursive(obj: unknown, order?: KeyOrder): unknown {
     if (order) {
       const orderMap = new Map(order.keys.map((k, i) => [k, i]))
       sortedKeys = [...keys].sort((a, b) => {
-        const ai = orderMap.has(a) ? orderMap.get(a)! : Infinity
-        const bi = orderMap.has(b) ? orderMap.get(b)! : Infinity
+        const ai = orderMap.get(a) ?? Infinity
+        const bi = orderMap.get(b) ?? Infinity
         if (ai !== Infinity || bi !== Infinity) return ai - bi
         return a.localeCompare(b)
       })

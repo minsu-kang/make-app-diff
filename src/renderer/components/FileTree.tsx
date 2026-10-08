@@ -62,7 +62,7 @@ const fileIcons: Record<string, React.ReactElement> = {
 const defaultFileIcon = fileBase('#8a8a8a')
 
 function getFileIcon(name: string): React.ReactElement {
-  const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : ''
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
   return fileIcons[ext] || defaultFileIcon
 }
 

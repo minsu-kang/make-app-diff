@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useId, useCallback } from 'react'
 import type { SearchApp, SearchEntry } from '../../preload/index'
 import { getMajor } from '../utils/version'
 
@@ -30,10 +30,16 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
   const [downloadedPath, setDownloadedPath] = useState<string | null>(null)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const listboxId = useId()
+  const optionId = useCallback((index: number) => `${listboxId}-option-${index}`, [listboxId])
 
   useEffect(() => {
     setHighlightedIndex(-1)
   }, [searchQuery])
+
+  useEffect(() => {
+    if (highlightedIndex >= 0) document.getElementById(optionId(highlightedIndex))?.scrollIntoView({ block: 'nearest' })
+  }, [highlightedIndex, optionId])
 
   useEffect(() => {
     setLoadingApps(true)
@@ -77,22 +83,25 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
       const majorGroups = new Map<number, string[]>()
       for (const v of app.availableVersions) {
         const major = getMajor(v)
-        if (!majorGroups.has(major)) majorGroups.set(major, [])
-        majorGroups.get(major)!.push(v)
+        const group = majorGroups.get(major)
+        if (group) group.push(v)
+        else majorGroups.set(major, [v])
       }
 
       if (majorGroups.size <= 1) {
         entries.push({ app, major: getMajor(app.version), versions: app.availableVersions })
       } else {
-        const sortedMajors = [...majorGroups.keys()].sort((a, b) => b - a)
-        for (const major of sortedMajors) {
-          entries.push({ app, major, versions: majorGroups.get(major)! })
+        const sortedGroups = [...majorGroups.entries()].sort(([a], [b]) => b - a)
+        for (const [major, versions] of sortedGroups) {
+          entries.push({ app, major, versions })
         }
       }
     }
 
     return entries.slice(0, 30)
   }, [searchQuery, allApps])
+
+  const showResults = searchQuery.trim() !== '' && filteredEntries.length > 0
 
   const handleSelectEntry = (entry: SearchEntry) => {
     setSelectedEntry(entry)
@@ -152,6 +161,15 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
                 ref={searchInputRef}
                 autoFocus
                 type="text"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={showResults}
+                aria-controls={showResults ? listboxId : undefined}
+                aria-activedescendant={
+                  showResults && highlightedIndex >= 0 && highlightedIndex < filteredEntries.length
+                    ? optionId(highlightedIndex)
+                    : undefined
+                }
                 value={
                   selectedEntry && !searchQuery
                     ? `${selectedEntry.app.label}${allApps.find((a) => a.name === selectedEntry.app.name)?.availableVersions.some((v) => getMajor(v) !== selectedEntry.major) ? ` (v${selectedEntry.major})` : ''}`
@@ -183,13 +201,16 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
               />
             </label>
 
-            {searchQuery.trim() && filteredEntries.length > 0 && (
-              <ul className="download-search-results">
+            {showResults && (
+              <ul id={listboxId} role="listbox" aria-label="Matching apps" className="download-search-results">
                 {filteredEntries.map((entry, index) => {
                   const hasMajors = entry.app.availableVersions.some((v) => getMajor(v) !== entry.major)
                   return (
                     <li
                       key={`${entry.app.name}-v${entry.major}`}
+                      id={optionId(index)}
+                      role="option"
+                      aria-selected={index === highlightedIndex}
                       className={`search-result-item${index === highlightedIndex ? ' highlighted' : ''}`}
                       onClick={() => handleSelectEntry(entry)}
                     >
