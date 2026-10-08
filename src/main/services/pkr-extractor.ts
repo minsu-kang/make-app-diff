@@ -1,15 +1,6 @@
 import { ExtractedFile } from '../types'
 import Pkr from 'pkr'
 
-interface PkrFile {
-  path: string
-  data: Buffer
-}
-
-interface PkrFiles extends Array<PkrFile> {
-  find(path: string): PkrFile | null
-}
-
 const BINARY_MIME: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -26,7 +17,7 @@ function getBinaryMime(filePath: string): string | null {
 }
 
 export function extractPkr(buffer: Buffer): ExtractedFile[] {
-  const files: PkrFiles = Pkr.unpackSync(buffer)
+  const files = Pkr.unpackSync(buffer)
   const result: ExtractedFile[] = []
 
   for (const file of files) {
