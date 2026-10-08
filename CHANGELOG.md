@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/integromat/make-app-diff/compare/v1.7.0...v1.7.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* make download search a combobox and drop non-null assertions ([fcdca65](https://github.com/integromat/make-app-diff/commit/fcdca657133ef0ccaf2591d1758540cbdac56d84))
+
 ## [1.7.0](https://github.com/minsu-kang/make-app-diff/compare/v1.6.0...v1.7.0) (2026-10-08)
 
 
