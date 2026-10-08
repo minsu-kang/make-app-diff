@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/minsu-kang/make-app-diff/compare/v1.6.0...v1.7.0) (2026-10-08)
+
+
+### Features
+
+* replace update check with a releases page link ([#57](https://github.com/minsu-kang/make-app-diff/issues/57)) ([7469bc2](https://github.com/minsu-kang/make-app-diff/commit/7469bc2a902ba88cb733a2ed47cb1d56daf642b6))
+
+
+### Bug Fixes
+
+* reload the app list after settings are saved ([#58](https://github.com/minsu-kang/make-app-diff/issues/58)) ([bbaa012](https://github.com/minsu-kang/make-app-diff/commit/bbaa0123b1fd71d0aca5bc1495996a0c40fda7fa))
+
 ## [1.6.0](https://github.com/minsu-kang/make-app-diff/compare/v1.5.5...v1.6.0) (2026-08-21)
 
 
