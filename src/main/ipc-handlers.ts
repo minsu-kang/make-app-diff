@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell, clipboard, BrowserWindow } from 'electron'
+import { ipcMain, dialog, shell, clipboard } from 'electron'
 import * as fs from 'fs/promises'
 import { createWriteStream } from 'fs'
 import * as path from 'path'
@@ -703,36 +703,6 @@ export function registerIpcHandlers(): void {
       }
     }
   )
-
-  ipcMain.handle('update:check', async () => {
-    try {
-      const { checkForUpdates } = await import('./index')
-      const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
-      if (win) await checkForUpdates(win, true)
-      return { success: true }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { success: false, error: message }
-    }
-  })
-
-  ipcMain.handle('update:open-release', (_event, version: string) => {
-    try {
-      const base = `https://github.com/minsu-kang/make-app-diff/releases/download/v${version}`
-      let url: string
-      if (process.platform === 'win32') {
-        url = `${base}/MakeDiff.Setup.${version}.exe`
-      } else {
-        const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
-        url = `${base}/MakeDiff-${version}-${arch}.dmg`
-      }
-      shell.openExternal(url)
-      return { success: true }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { success: false, error: message }
-    }
-  })
 
   ipcMain.handle('ipm:download-version', async (_event, appName: string, version: string) => {
     try {

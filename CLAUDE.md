@@ -60,7 +60,7 @@ All IPC handlers return `IpcResult<T>`:
 
 ## Key Files
 
-- `src/main/index.ts` — Window creation, menu setup, update check
+- `src/main/index.ts` — Window creation, menu setup
 - `src/main/ipc-handlers.ts` — All IPC channel registration
 - `src/preload/index.ts` — Exposes `window.api`, `window.appVersion`, `window.onMenu`
 - `src/renderer/App.tsx` — Root component, state management
