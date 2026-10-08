@@ -32,6 +32,7 @@ function countChanges(diffs: FileDiff[]): { added: number; deleted: number; modi
 export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [forcedSettings, setForcedSettings] = useState(false)
+  const [appListRefreshKey, setAppListRefreshKey] = useState(0)
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
   const [fromVersion, setFromVersion] = useState('')
   const [toVersion, setToVersion] = useState('')
@@ -238,6 +239,7 @@ export default function App() {
           onSettingsClick={() => setShowSettings(true)}
           appIcon={appIcon}
           appTheme={appInfo?.theme}
+          refreshKey={appListRefreshKey}
         />
       )}
 
@@ -464,6 +466,7 @@ export default function App() {
       {showSettings && (
         <Settings
           forced={forcedSettings}
+          onSaved={() => setAppListRefreshKey((k) => k + 1)}
           onClose={() => {
             setShowSettings(false)
             setForcedSettings(false)
