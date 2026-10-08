@@ -324,7 +324,7 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push to main, PR to main | Lint, format check, test with coverage |
+| `ci.yml` | push to main, PR to main | Jobs `lint`, `format`, `typecheck`, `unit` (vitest with coverage thresholds), `build`. Each job is a required check in mono |
 | `pr-validate.yml` | PR opened/edited | PR title must follow Conventional Commits |
 | `release-please.yml` | push to main, workflow_dispatch | CHANGELOG + version bump + DMG/EXE build |
 
@@ -334,5 +334,7 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 3. DMG + EXE uploaded to Release assets
 
 **Updates:** There is no in-app update check. File > Open Releases Page opens the Releases page in the browser, and releases are installed manually.
+
+**Review:** Make Review, the org GitHub App, reviews pull requests automatically. No repository configuration is needed.
 
 **Ownership:** Repository access and CODEOWNERS are declared in mono (`libs/github-resources`, owner: athena team). Do not add a root `CODEOWNERS` file.

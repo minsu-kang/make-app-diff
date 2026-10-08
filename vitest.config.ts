@@ -11,7 +11,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       include: ['src/main/services/**/*.ts', 'src/renderer/utils/**/*.ts'],
-      exclude: ['src/main/services/__tests__/**', 'src/renderer/utils/__tests__/**']
+      exclude: ['src/main/services/__tests__/**', 'src/renderer/utils/__tests__/**'],
+      thresholds: {
+        statements: 85,
+        branches: 75,
+        functions: 90,
+        lines: 85
+      }
     }
   }
 })
