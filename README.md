@@ -15,29 +15,14 @@ Built with Electron + React + TypeScript for macOS and Windows.
 - **Dependency diffing** — Automatically downloads and diffs account/hook dependencies from manifests
 - **Three themes** — Dark (default), Make (purple), Light (Apple-inspired)
 - **App download** — Download any app version to a local folder in SDK structure
-- **Update notification** — Checks GitHub Releases for new versions on startup
 
 ## Installation
 
-### Homebrew (macOS, recommended)
+Download the latest release from the [Releases](https://github.com/integromat/make-app-diff/releases) page. The repository is private, so you must be an integromat org member signed in to GitHub:
+- **macOS**: `.dmg` file (Apple Silicon only)
+- **Windows**: `.exe` installer
 
-```bash
-brew install --cask minsu-kang/makediff/makediff && xattr -cr /Applications/MakeDiff.app
-```
-
-To update to the latest version:
-
-```bash
-brew update && brew upgrade --cask makediff
-```
-
-### Manual Download
-
-Download the latest release from the [Releases](https://github.com/minsu-kang/make-app-diff/releases) page:
-- **macOS** — `.dmg` file
-- **Windows** — `.exe` installer
-
-> **"MakeDiff is damaged" warning on macOS (manual install only)**
+> **"MakeDiff is damaged" warning on macOS**
 >
 > The app is not code-signed, so macOS Gatekeeper will block it. Run the following in Terminal:
 > ```bash
