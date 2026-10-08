@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import type { AppInfo, FileDiff, DiffResult } from '../preload/index'
 import Sidebar from './components/Sidebar'
 import Settings from './components/Settings'
@@ -47,44 +47,59 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [viewMode, setViewMode] = useState<'diff' | 'show'>('diff')
   const [decompile, setDecompile] = useState(true)
+  // Bumped whenever a Show/Compare starts or the selected app changes, so a response for an older request is dropped
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     const cleanupSettings = window.onMenu.openSettings(() => setShowSettings(true))
     const cleanupDownload = window.onMenu.downloadApp(() => setShowDownloadModal(true))
     const cleanupInfo = window.onMenu.showInfo(() => setShowInfo(true))
-    window.api.theme.load().then((theme) => {
-      document.documentElement.setAttribute('data-theme', theme)
-    })
+    window.api.theme
+      .load()
+      .then((theme) => {
+        document.documentElement.setAttribute('data-theme', theme)
+      })
+      .catch((error: unknown) => console.error('Failed to load the theme', error))
 
     // Check session expiry, then check if token exists
-    window.api.session.check().then(({ expired }) => {
-      if (expired) {
-        showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
-        setForcedSettings(true)
-        setShowSettings(true)
-        return
-      }
-      window.api.settings.load().then((settings) => {
-        const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
-        if (!token || !token.trim()) {
+    window.api.session
+      .check()
+      .then(({ expired }) => {
+        if (expired) {
+          showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
           setForcedSettings(true)
           setShowSettings(true)
-        } else {
-          // Tokens exist and session is valid — enable menu items
-          window.api.menu.setEnabled(true)
+          return
         }
+        return window.api.settings.load().then((settings) => {
+          const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
+          if (!token || !token.trim()) {
+            setForcedSettings(true)
+            setShowSettings(true)
+          } else {
+            // Tokens exist and session is valid — enable menu items
+            window.api.menu.setEnabled(true)
+          }
+        })
       })
-    })
+      .catch((error: unknown) => {
+        console.error('Failed to check the session', error)
+        showToast('Could not check the session. Open Settings to verify your tokens.', 'error')
+      })
 
     // Periodic session check (every 30 minutes)
     const sessionInterval = setInterval(
       async () => {
-        const { expired } = await window.api.session.check()
-        if (expired) {
-          showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
-          window.api.menu.setEnabled(false)
-          setForcedSettings(true)
-          setShowSettings(true)
+        try {
+          const { expired } = await window.api.session.check()
+          if (expired) {
+            showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
+            window.api.menu.setEnabled(false)
+            setForcedSettings(true)
+            setShowSettings(true)
+          }
+        } catch (error) {
+          console.error('Failed to check the session', error)
         }
       },
       30 * 60 * 1000
@@ -107,48 +122,77 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [showInfo])
 
-  const handleAppSelect = useCallback((info: AppInfo) => {
-    setAppInfo(info)
-    setDiffResult(null)
-    setSelectedFile(null)
-    setError(null)
-    setAppIcon(null)
-    setDecompile(true)
-
-    // Fetch app icon from /admin/icon/apps/{appName}
-    window.api.ipm
-      .getAppIcon(info.name)
-      .then((result) => {
-        if (result.success && result.data) {
-          setAppIcon(result.data)
-        }
-      })
-      .catch(() => {})
-
-    // Auto-select previous → latest version pairing
-    const versions = info.versions || []
-    if (versions.length >= 2) {
-      setFromVersion(versions[1])
-      setToVersion(versions[0])
-    } else if (versions.length === 1) {
-      setFromVersion('')
-      setToVersion(versions[0])
-    } else {
-      setFromVersion('')
-      setToVersion('')
-    }
+  const invalidateRequests = useCallback(() => {
+    requestIdRef.current++
+    setLoading(false)
   }, [])
 
+  const handleFromChange = useCallback(
+    (version: string) => {
+      invalidateRequests()
+      setFromVersion(version)
+    },
+    [invalidateRequests]
+  )
+
+  const handleToChange = useCallback(
+    (version: string) => {
+      invalidateRequests()
+      setToVersion(version)
+    },
+    [invalidateRequests]
+  )
+
+  const handleAppSelect = useCallback(
+    (info: AppInfo) => {
+      invalidateRequests()
+      setAppInfo(info)
+      setDiffResult(null)
+      setSelectedFile(null)
+      setError(null)
+      setAppIcon(null)
+      setDecompile(true)
+
+      // Fetch app icon from /admin/icon/apps/{appName}
+      window.api.ipm
+        .getAppIcon(info.name)
+        .then((result) => {
+          if (result.success && result.data) {
+            setAppIcon(result.data)
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to load app icon', error)
+        })
+
+      // Auto-select previous → latest version pairing
+      const versions = info.versions || []
+      if (versions.length >= 2) {
+        setFromVersion(versions[1])
+        setToVersion(versions[0])
+      } else if (versions.length === 1) {
+        setFromVersion('')
+        setToVersion(versions[0])
+      } else {
+        setFromVersion('')
+        setToVersion('')
+      }
+    },
+    [invalidateRequests]
+  )
+
   const handleSwap = useCallback(() => {
+    invalidateRequests()
     setFromVersion(toVersion)
     setToVersion(fromVersion)
-  }, [fromVersion, toVersion])
+  }, [fromVersion, toVersion, invalidateRequests])
 
   const handleCompare = useCallback(
     async (decompileFlag?: boolean) => {
       if (!appInfo || !fromVersion || !toVersion) return
 
       const flag = typeof decompileFlag === 'boolean' ? decompileFlag : decompile
+      const requestId = ++requestIdRef.current
       setViewMode('diff')
       setLoading(true)
       setError(null)
@@ -156,16 +200,18 @@ export default function App() {
 
       try {
         const result = await window.api.ipm.getDiff(appInfo.name, fromVersion, toVersion, flag)
+        if (requestId !== requestIdRef.current) return
         if (result.success && result.data) {
           setDiffResult(result.data)
         } else {
           setError(result.error || 'Compare failed')
         }
       } catch (err) {
+        if (requestId !== requestIdRef.current) return
         const message = err instanceof Error ? err.message : String(err)
         setError(message)
       } finally {
-        setLoading(false)
+        if (requestId === requestIdRef.current) setLoading(false)
       }
     },
     [appInfo, fromVersion, toVersion, decompile]
@@ -175,22 +221,25 @@ export default function App() {
     async (version: string, decompileFlag?: boolean) => {
       if (!appInfo) return
       const flag = typeof decompileFlag === 'boolean' ? decompileFlag : decompile
+      const requestId = ++requestIdRef.current
       setViewMode('show')
       setLoading(true)
       setError(null)
       setSelectedFile(null)
       try {
         const result = await window.api.ipm.showVersion(appInfo.name, version, flag)
+        if (requestId !== requestIdRef.current) return
         if (result.success && result.data) {
           setDiffResult(result.data)
         } else {
           setError(result.error || 'Show failed')
         }
       } catch (err) {
+        if (requestId !== requestIdRef.current) return
         const message = err instanceof Error ? err.message : String(err)
         setError(message)
       } finally {
-        setLoading(false)
+        if (requestId === requestIdRef.current) setLoading(false)
       }
     },
     [appInfo, decompile]
@@ -207,13 +256,17 @@ export default function App() {
     const files = diffResult.diffs
       .filter((d) => d.newContent)
       .map((d) => ({ path: d.filePath, content: d.newContent! }))
-    const result = await window.api.editor.openInVscode({
-      appName: appInfo.name,
-      version: toVersion,
-      files
-    })
-    if (!result.success) {
-      showToast(result.error || 'Failed to open VS Code', 'error')
+    try {
+      const result = await window.api.editor.openInVscode({
+        appName: appInfo.name,
+        version: toVersion,
+        files
+      })
+      if (!result.success) {
+        showToast(result.error || 'Failed to open VS Code', 'error')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
     }
   }, [appInfo, diffResult, toVersion])
 
@@ -372,8 +425,8 @@ export default function App() {
                 appName={appInfo.name}
                 fromVersion={fromVersion}
                 toVersion={toVersion}
-                onFromChange={setFromVersion}
-                onToChange={setToVersion}
+                onFromChange={handleFromChange}
+                onToChange={handleToChange}
                 onSwap={handleSwap}
                 onCompare={handleCompare}
                 onShow={handleShow}

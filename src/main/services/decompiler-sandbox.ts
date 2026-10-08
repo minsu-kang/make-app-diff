@@ -11,13 +11,14 @@ import * as acorn from 'acorn'
 type Node = acorn.Node & Record<string, unknown>
 
 function parse(code: string): Node {
+  // acorn's Program has no index signature, so a direct cast to Node is rejected (TS2352)
   return acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'script' }) as unknown as Node
 }
 
 function evalStaticNode(node: Node): unknown {
   switch (node.type) {
     case 'Literal':
-      return (node as unknown as { value: unknown }).value
+      return node.value
     case 'ObjectExpression': {
       const obj: Record<string, unknown> = {}
       for (const prop of node.properties as Node[]) {
@@ -48,8 +49,8 @@ function evalStaticNode(node: Node): unknown {
     }
     case 'UnaryExpression': {
       const arg = node.argument as Node
-      if (arg.type === 'Literal' && typeof (arg as unknown as { value: unknown }).value === 'number') {
-        const num = (arg as unknown as { value: number }).value
+      const num = arg.value
+      if (arg.type === 'Literal' && typeof num === 'number') {
         if (node.operator === '-') return -num
         if (node.operator === '+') return num
       }
@@ -63,9 +64,8 @@ function evalStaticNode(node: Node): unknown {
 function staticPropertyKey(prop: Node): string {
   const key = prop.key as Node
   if (key.type === 'Identifier') return key.name as string
-  if (key.type === 'Literal' && typeof (key as unknown as { value: unknown }).value === 'string') {
-    return (key as unknown as { value: string }).value
-  }
+  const literalKey = key.value
+  if (key.type === 'Literal' && typeof literalKey === 'string') return literalKey
   throw new Error(`unsupported property key: ${key.type}`)
 }
 
@@ -223,8 +223,9 @@ export function parseFunctions(code: string): Record<string, string> {
     }
     const name = staticPropertyKey(prop)
     const value = prop.value as Node
-    if (value.type === 'Literal' && typeof (value as unknown as { value: unknown }).value === 'string') {
-      result[name] = (value as unknown as { value: string }).value
+    const literal = value.value
+    if (value.type === 'Literal' && typeof literal === 'string') {
+      result[name] = literal
     } else if (value.type === 'FunctionExpression' || value.type === 'FunctionDeclaration') {
       result[name] = code.slice(value.start as number, value.end as number)
     } else {

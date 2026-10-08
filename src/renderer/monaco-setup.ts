@@ -2,6 +2,9 @@ import * as monaco from 'monaco-editor'
 import { loader } from '@monaco-editor/react'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
+import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
 import { imljsonLanguage, imljsonLanguageConfig } from './languages/imljson'
 import { makediffDark, makediffMake, makediffLight } from './themes/monaco-themes'
 
@@ -9,9 +12,20 @@ import { makediffDark, makediffMake, makediffLight } from './themes/monaco-theme
 self.MonacoEnvironment = {
   getWorker(_: string, label: string) {
     if (label === 'json') return new jsonWorker()
+    if (label === 'typescript' || label === 'javascript') return new tsWorker()
+    if (label === 'css' || label === 'scss' || label === 'less') return new cssWorker()
+    if (label === 'html' || label === 'handlebars' || label === 'razor') return new htmlWorker()
     return new editorWorker()
   }
 }
+
+// Read-only viewer: the language workers run, but compiled and generated code gets no error underlines
+const noDiagnostics = { noSemanticValidation: true, noSyntaxValidation: true, noSuggestionDiagnostics: true }
+monaco.typescript.typescriptDefaults.setDiagnosticsOptions(noDiagnostics)
+monaco.typescript.javascriptDefaults.setDiagnosticsOptions(noDiagnostics)
+monaco.css.cssDefaults.setOptions({ validate: false })
+monaco.css.scssDefaults.setOptions({ validate: false })
+monaco.css.lessDefaults.setOptions({ validate: false })
 
 // Use local monaco instance instead of CDN
 loader.config({ monaco })

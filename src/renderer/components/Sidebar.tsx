@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import type { AppInfo, SearchApp, SearchEntry, FavoriteApp, RecentApp } from '../../preload/index'
 import { getMajor } from '../utils/version'
+import { onActivateKey } from '../utils/keyboard'
 
 interface SidebarProps {
   onAppSelect: (info: AppInfo) => void
@@ -37,12 +38,18 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
   }, [])
 
   useEffect(() => {
-    window.api.favorites.load().then((r) => {
-      if (r.success && r.data) setFavorites(r.data)
-    })
-    window.api.recent.load().then((r) => {
-      if (r.success && r.data) setRecentApps(r.data)
-    })
+    window.api.favorites
+      .load()
+      .then((r) => {
+        if (r.success && r.data) setFavorites(r.data)
+      })
+      .catch((err: unknown) => console.error('Failed to load favorites', err))
+    window.api.recent
+      .load()
+      .then((r) => {
+        if (r.success && r.data) setRecentApps(r.data)
+      })
+      .catch((err: unknown) => console.error('Failed to load recent apps', err))
   }, [])
 
   useEffect(() => {
@@ -58,6 +65,9 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
         } else {
           setError(result.error || 'Failed to load apps')
         }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       })
       .finally(() => {
         if (!cancelled) setLoadingApps(false)
@@ -121,9 +131,12 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
         setSelectedApp(info)
         setSelectedMajor(entry.major)
         onAppSelect(info)
-        window.api.recent.add(entry.app.name, info.label || entry.app.name, entry.major).then((r) => {
-          if (r.success && r.data) setRecentApps(r.data)
-        })
+        window.api.recent
+          .add(entry.app.name, info.label || entry.app.name, entry.major)
+          .then((r) => {
+            if (r.success && r.data) setRecentApps(r.data)
+          })
+          .catch((err: unknown) => console.error('Failed to update recent apps', err))
       } else {
         setError(result.error || 'Failed to load app info')
       }
@@ -148,9 +161,12 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
         setSelectedApp(info)
         setSelectedMajor(major)
         onAppSelect(info)
-        window.api.recent.add(name, info.label || label, major).then((r) => {
-          if (r.success && r.data) setRecentApps(r.data)
-        })
+        window.api.recent
+          .add(name, info.label || label, major)
+          .then((r) => {
+            if (r.success && r.data) setRecentApps(r.data)
+          })
+          .catch((err: unknown) => console.error('Failed to update recent apps', err))
       } else {
         setError(result.error || 'Failed to load app info')
       }
@@ -165,7 +181,7 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
       ? favorites.filter((f) => !(f.name === name && f.major === major))
       : [...favorites, { name, label, major, addedAt: Date.now() }]
     setFavorites(updated)
-    window.api.favorites.save(updated)
+    window.api.favorites.save(updated).catch((err: unknown) => console.error('Failed to save favorites', err))
   }
 
   const isFavorite = (name: string, major: number | null) => favorites.some((f) => f.name === name && f.major === major)
@@ -275,7 +291,11 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
                     <li
                       key={`${fav.name}-${fav.major}`}
                       className={`sidebar-app-item ${selectedApp?.name === fav.name && selectedMajor === fav.major ? 'active' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-disabled={loadingApps}
                       onClick={() => !loadingApps && handleQuickSelect(fav.name, fav.label, fav.major)}
+                      onKeyDown={onActivateKey(() => !loadingApps && handleQuickSelect(fav.name, fav.label, fav.major))}
                     >
                       <span className="sidebar-app-item-label">{fav.label}</span>
                       <span className="sidebar-app-item-name">
@@ -303,7 +323,11 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
                     <li
                       key={`${app.name}-${app.major}`}
                       className={`sidebar-app-item ${selectedApp?.name === app.name && selectedMajor === app.major ? 'active' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-disabled={loadingApps}
                       onClick={() => !loadingApps && handleQuickSelect(app.name, app.label, app.major)}
+                      onKeyDown={onActivateKey(() => !loadingApps && handleQuickSelect(app.name, app.label, app.major))}
                     >
                       <span className="sidebar-app-item-label">{app.label}</span>
                       <span className="sidebar-app-item-name">

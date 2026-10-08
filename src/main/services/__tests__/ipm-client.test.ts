@@ -38,6 +38,31 @@ describe('IpmClient constructor', () => {
     })
   })
 
+  it('falls back to the default version and env when they are blank', () => {
+    new IpmClient(makeSettings({ ipmVersion: '', env: '' }))
+    expect(mockAxiosCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'x-imt-ipm-version': '3.20.0',
+          'x-imt-env': 'staging'
+        })
+      })
+    )
+  })
+
+  it('applies the same defaults when the settings are updated to blank values', () => {
+    const client = new IpmClient(makeSettings())
+    client.updateSettings(makeSettings({ ipmVersion: '', env: '' }))
+    expect(mockAxiosCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'x-imt-ipm-version': '3.20.0',
+          'x-imt-env': 'staging'
+        })
+      })
+    )
+  })
+
   it('uses ipmeToken for ipme host', () => {
     new IpmClient(makeSettings({ host: 'ipme.integromat.com' }))
     expect(mockAxiosCreate).toHaveBeenCalledWith(
@@ -52,12 +77,36 @@ describe('IpmClient constructor', () => {
 })
 
 describe('updateSettings', () => {
-  it('creates a new client with updated settings', () => {
+  it('builds the new client with the new host and token', () => {
     const client = new IpmClient(makeSettings())
-    expect(mockAxiosCreate).toHaveBeenCalledTimes(1)
+    client.updateSettings(makeSettings({ host: 'ipme.integromat.com', env: 'production', ipmVersion: '4.0.0' }))
 
-    client.updateSettings(makeSettings({ host: 'ipme.integromat.com' }))
     expect(mockAxiosCreate).toHaveBeenCalledTimes(2)
+    expect(mockAxiosCreate).toHaveBeenLastCalledWith({
+      baseURL: 'https://ipme.integromat.com',
+      timeout: 30000,
+      headers: {
+        'x-imt-token': 'token-staging',
+        'x-imt-ipm-version': '4.0.0',
+        'x-imt-env': 'production'
+      }
+    })
+  })
+
+  it('sends later requests through the rebuilt client and checks the new token', async () => {
+    const oldGet = vi.fn().mockResolvedValue({ data: {} })
+    const newGet = vi.fn().mockResolvedValue({ data: [] })
+    const created = [{ get: oldGet }, { get: newGet }]
+    mockAxiosCreate.mockImplementation(() => created.shift() as never)
+
+    const client = new IpmClient(makeSettings())
+    client.updateSettings(makeSettings({ host: 'ipme.integromat.com', ipmeToken: 'token-staging' }))
+    await client.searchApps()
+    expect(newGet).toHaveBeenCalledWith('/search/apps')
+    expect(oldGet).not.toHaveBeenCalled()
+
+    client.updateSettings(makeSettings({ host: 'ipme.integromat.com', ipmeToken: '' }))
+    await expect(client.testConnection()).rejects.toThrow('Token is required')
   })
 })
 

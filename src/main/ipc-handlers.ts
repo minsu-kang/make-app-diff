@@ -7,8 +7,9 @@ import { execFile } from 'child_process'
 import archiver from 'archiver'
 import { enableMenuItems, disableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
-import { extractPkr } from './services/pkr-extractor'
+import { extractPkr, toFileData } from './services/pkr-extractor'
 import { computeDiff } from './services/diff-service'
+import { createLimiter, type Limiter } from './services/concurrency'
 import {
   loadSettings,
   saveSettings,
@@ -104,12 +105,25 @@ interface CachedShowData {
 let diffCache: CachedDiffData | null = null
 let showCache: CachedShowData | null = null
 
+// Caches are keyed by app and version only: drop them when host or tokens change, and let a request that
+// started before the drop skip its cache write (generation)
+let cacheGeneration = 0
+
+function clearCaches(): void {
+  cacheGeneration++
+  diffCache = null
+  showCache = null
+}
+
+const DEP_DOWNLOAD_CONCURRENCY = 4
+
 async function downloadDepsForVersion(
   client: IpmClient,
   depNames: string[],
   version: string,
   depType: 'account' | 'hook',
-  isCustom: boolean
+  isCustom: boolean,
+  limit: Limiter
 ): Promise<ExtractedFile[]> {
   const decompileFn = depType === 'account' ? decompileAccount : decompileHook
   const compiledFolder = depType === 'account' ? 'accounts' : 'hooks'
@@ -117,17 +131,19 @@ async function downloadDepsForVersion(
   const results: ExtractedFile[] = []
 
   await Promise.all(
-    depNames.map(async (depName) => {
-      try {
-        const buffer = await client.downloadDependencyComponent(depName, version, depType)
-        let files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
-        const folder = isCustom ? sdkFolder : compiledFolder
-        if (isCustom) files = decompileFn(files)
-        results.push(...files.map((f) => ({ ...f, path: `${folder}/${depName}/${f.path}` })))
-      } catch {
-        /* skip */
-      }
-    })
+    depNames.map((depName) =>
+      limit(async () => {
+        try {
+          const buffer = await client.downloadDependencyComponent(depName, version, depType)
+          let files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
+          const folder = isCustom ? sdkFolder : compiledFolder
+          if (isCustom) files = decompileFn(files)
+          results.push(...files.map((f) => ({ ...f, path: `${folder}/${depName}/${f.path}` })))
+        } catch {
+          /* skip */
+        }
+      })
+    )
   )
 
   return results
@@ -152,20 +168,23 @@ async function downloadRawDeps(
   client: IpmClient,
   depNames: string[],
   version: string,
-  depType: 'account' | 'hook'
+  depType: 'account' | 'hook',
+  limit: Limiter
 ): Promise<RawDepEntry[]> {
   const results: RawDepEntry[] = []
 
   await Promise.all(
-    depNames.map(async (depName) => {
-      try {
-        const buffer = await client.downloadDependencyComponent(depName, version, depType)
-        const files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
-        results.push({ depName, files: cloneFiles(files) })
-      } catch {
-        /* skip */
-      }
-    })
+    depNames.map((depName) =>
+      limit(async () => {
+        try {
+          const buffer = await client.downloadDependencyComponent(depName, version, depType)
+          const files = extractPkr(buffer).filter((f) => f.path !== 'lib/functions.js')
+          results.push({ depName, files: cloneFiles(files) })
+        } catch {
+          /* skip */
+        }
+      })
+    )
   )
 
   return results
@@ -204,7 +223,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('session:check', () => {
     if (isSessionExpired()) {
       clearTokens()
-      ipmClient.updateSettings(loadSettings())
+      ipmClient = new IpmClient(loadSettings())
+      clearCaches()
       disableMenuItems()
       return { expired: true }
     }
@@ -241,7 +261,8 @@ export function registerIpcHandlers(): void {
       return { success: false, error: message }
     }
     saveSettings(settings)
-    ipmClient.updateSettings(settings)
+    ipmClient = testClient
+    clearCaches()
     touchActivity()
     enableMenuItems()
     return { success: true }
@@ -316,11 +337,13 @@ export function registerIpcHandlers(): void {
     'ipm:get-diff',
     async (_event, appName: string, fromVersion: string, toVersion: string, decompile: boolean = true) => {
       try {
-        const cacheHit =
+        const cached =
           diffCache &&
           diffCache.appName === appName &&
           diffCache.fromVersion === fromVersion &&
           diffCache.toVersion === toVersion
+            ? diffCache
+            : null
 
         let fromRawFiles: ExtractedFile[]
         let toRawFiles: ExtractedFile[]
@@ -331,22 +354,26 @@ export function registerIpcHandlers(): void {
         let fromHookDeps: RawDepEntry[]
         let toHookDeps: RawDepEntry[]
 
-        if (cacheHit) {
-          fromRawFiles = diffCache!.fromFiles
-          toRawFiles = diffCache!.toFiles
-          fromIsCustom = diffCache!.fromIsCustom
-          toIsCustom = diffCache!.toIsCustom
-          fromAccDeps = diffCache!.fromAccDeps
-          toAccDeps = diffCache!.toAccDeps
-          fromHookDeps = diffCache!.fromHookDeps
-          toHookDeps = diffCache!.toHookDeps
+        if (cached) {
+          fromRawFiles = cached.fromFiles
+          toRawFiles = cached.toFiles
+          fromIsCustom = cached.fromIsCustom
+          toIsCustom = cached.toIsCustom
+          fromAccDeps = cached.fromAccDeps
+          toAccDeps = cached.toAccDeps
+          fromHookDeps = cached.fromHookDeps
+          toHookDeps = cached.toHookDeps
         } else {
+          const client = ipmClient
+          const generation = cacheGeneration
+          const limit = createLimiter(DEP_DOWNLOAD_CONCURRENCY)
+
           // Download app + get manifests in parallel
           const [fromAppBuffer, toAppBuffer, fromManifest, toManifest] = await Promise.all([
-            ipmClient.downloadComponent(appName, fromVersion, 'app'),
-            ipmClient.downloadComponent(appName, toVersion, 'app'),
-            ipmClient.getManifest(appName, fromVersion),
-            ipmClient.getManifest(appName, toVersion)
+            client.downloadComponent(appName, fromVersion, 'app'),
+            client.downloadComponent(appName, toVersion, 'app'),
+            client.getManifest(appName, fromVersion),
+            client.getManifest(appName, toVersion)
           ])
 
           fromRawFiles = cloneFiles(extractPkr(fromAppBuffer))
@@ -364,28 +391,32 @@ export function registerIpcHandlers(): void {
 
           const depResults = await Promise.all([
             downloadRawDeps(
-              ipmClient,
+              client,
               allAccounts.filter((d) => fromAccounts.includes(d)),
               fromVersion,
-              'account'
+              'account',
+              limit
             ),
             downloadRawDeps(
-              ipmClient,
+              client,
               allAccounts.filter((d) => toAccounts.includes(d)),
               toVersion,
-              'account'
+              'account',
+              limit
             ),
             downloadRawDeps(
-              ipmClient,
+              client,
               allHooks.filter((d) => fromHooks.includes(d)),
               fromVersion,
-              'hook'
+              'hook',
+              limit
             ),
             downloadRawDeps(
-              ipmClient,
+              client,
               allHooks.filter((d) => toHooks.includes(d)),
               toVersion,
-              'hook'
+              'hook',
+              limit
             )
           ])
           fromAccDeps = depResults[0]
@@ -393,19 +424,20 @@ export function registerIpcHandlers(): void {
           fromHookDeps = depResults[2]
           toHookDeps = depResults[3]
 
-          // Save to cache
-          diffCache = {
-            appName,
-            fromVersion,
-            toVersion,
-            fromFiles: fromRawFiles,
-            toFiles: toRawFiles,
-            fromIsCustom,
-            toIsCustom,
-            fromAccDeps,
-            toAccDeps,
-            fromHookDeps,
-            toHookDeps
+          if (generation === cacheGeneration) {
+            diffCache = {
+              appName,
+              fromVersion,
+              toVersion,
+              fromFiles: fromRawFiles,
+              toFiles: toRawFiles,
+              fromIsCustom,
+              toIsCustom,
+              fromAccDeps,
+              toAccDeps,
+              fromHookDeps,
+              toHookDeps
+            }
           }
         }
 
@@ -434,22 +466,26 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('ipm:show-version', async (_event, appName: string, version: string, decompile: boolean = true) => {
     try {
-      const cacheHit = showCache && showCache.appName === appName && showCache.version === version
+      const cached = showCache && showCache.appName === appName && showCache.version === version ? showCache : null
 
       let rawFiles: ExtractedFile[]
       let isCustom: boolean
       let accDeps: RawDepEntry[]
       let hookDeps: RawDepEntry[]
 
-      if (cacheHit) {
-        rawFiles = showCache!.files
-        isCustom = showCache!.isCustom
-        accDeps = showCache!.accDeps
-        hookDeps = showCache!.hookDeps
+      if (cached) {
+        rawFiles = cached.files
+        isCustom = cached.isCustom
+        accDeps = cached.accDeps
+        hookDeps = cached.hookDeps
       } else {
+        const client = ipmClient
+        const generation = cacheGeneration
+        const limit = createLimiter(DEP_DOWNLOAD_CONCURRENCY)
+
         const [appBuffer, manifest] = await Promise.all([
-          ipmClient.downloadComponent(appName, version, 'app'),
-          ipmClient.getManifest(appName, version)
+          client.downloadComponent(appName, version, 'app'),
+          client.getManifest(appName, version)
         ])
 
         rawFiles = cloneFiles(extractPkr(appBuffer))
@@ -458,13 +494,15 @@ export function registerIpcHandlers(): void {
         const accounts = manifest.dependencies?.accounts || []
         const hooks = manifest.dependencies?.hooks || []
         const showDepResults = await Promise.all([
-          downloadRawDeps(ipmClient, accounts, version, 'account'),
-          downloadRawDeps(ipmClient, hooks, version, 'hook')
+          downloadRawDeps(client, accounts, version, 'account', limit),
+          downloadRawDeps(client, hooks, version, 'hook', limit)
         ])
         accDeps = showDepResults[0]
         hookDeps = showDepResults[1]
 
-        showCache = { appName, version, files: rawFiles, isCustom, accDeps, hookDeps }
+        if (generation === cacheGeneration) {
+          showCache = { appName, version, files: rawFiles, isCustom, accDeps, hookDeps }
+        }
       }
 
       const files = isCustom && decompile ? decompileApp(cloneFiles(rawFiles), appName) : cloneFiles(rawFiles)
@@ -497,7 +535,7 @@ export function registerIpcHandlers(): void {
         for (const file of opts.files) {
           const filePath = sanitizePath(tmpDir, file.path)
           await fs.mkdir(path.dirname(filePath), { recursive: true })
-          await fs.writeFile(filePath, file.content, 'utf-8')
+          await fs.writeFile(filePath, toFileData(file.path, file.content))
         }
 
         const codePaths =
@@ -594,6 +632,8 @@ export function registerIpcHandlers(): void {
       }
     ) => {
       try {
+        assertPathSegment(opts.fromVersion, 'fromVersion')
+        assertPathSegment(opts.toVersion, 'toVersion')
         const tmpDir = path.join(tmpdir(), 'makediff')
         await fs.mkdir(tmpDir, { recursive: true })
 
@@ -663,10 +703,11 @@ export function registerIpcHandlers(): void {
           const output = createWriteStream(zipPath)
           const archive = archiver('zip', { zlib: { level: 9 } })
           output.on('close', resolve)
+          output.on('error', reject)
           archive.on('error', reject)
           archive.pipe(output)
           for (const file of opts.files) {
-            archive.append(file.content, { name: sanitizeZipEntryName(file.path) })
+            archive.append(toFileData(file.path, file.content), { name: sanitizeZipEntryName(file.path) })
           }
           archive.finalize()
         })
@@ -706,6 +747,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('ipm:download-version', async (_event, appName: string, version: string) => {
     try {
+      assertPathSegment(appName, 'appName')
+      assertPathSegment(version, 'version')
       const { canceled, filePaths } = await dialog.showOpenDialog({
         title: `Save ${appName}@${version}`,
         buttonLabel: 'Save',
@@ -716,11 +759,13 @@ export function registerIpcHandlers(): void {
       }
 
       const baseDir = path.join(filePaths[0], `${appName}@${version}`)
+      const client = ipmClient
+      const limit = createLimiter(DEP_DOWNLOAD_CONCURRENCY)
 
       // Download app + manifest in parallel
       const [appBuffer, manifest] = await Promise.all([
-        ipmClient.downloadComponent(appName, version, 'app'),
-        ipmClient.getManifest(appName, version)
+        client.downloadComponent(appName, version, 'app'),
+        client.getManifest(appName, version)
       ])
 
       // Extract app files, decompile if custom app
@@ -734,8 +779,8 @@ export function registerIpcHandlers(): void {
       const accounts = manifest.dependencies?.accounts || []
       const hooks = manifest.dependencies?.hooks || []
       const [accFiles, hookFiles] = await Promise.all([
-        downloadDepsForVersion(ipmClient, accounts, version, 'account', isCustom),
-        downloadDepsForVersion(ipmClient, hooks, version, 'hook', isCustom)
+        downloadDepsForVersion(client, accounts, version, 'account', isCustom, limit),
+        downloadDepsForVersion(client, hooks, version, 'hook', isCustom, limit)
       ])
       const allFiles = [...appFiles]
       pushNewFiles(allFiles, accFiles)
@@ -745,7 +790,7 @@ export function registerIpcHandlers(): void {
       for (const file of allFiles) {
         const filePath = sanitizePath(baseDir, file.path)
         await fs.mkdir(path.dirname(filePath), { recursive: true })
-        await fs.writeFile(filePath, file.content, 'utf-8')
+        await fs.writeFile(filePath, toFileData(file.path, file.content))
       }
 
       return { success: true, data: baseDir }

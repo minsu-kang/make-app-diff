@@ -1,7 +1,9 @@
-import { app, BrowserWindow, Menu, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
+import { isWebUrl, openExternal } from './services/external-link'
+import { loadRenderer } from './services/renderer-loader'
 
 const RELEASES_URL = 'https://github.com/integromat/make-app-diff/releases'
 
@@ -21,20 +23,23 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    const url = new URL(details.url)
-    if (url.protocol === 'https:' || url.protocol === 'http:') {
-      shell.openExternal(details.url)
-    }
+    if (isWebUrl(details.url)) openExternal(details.url, (url) => shell.openExternal(url))
     return { action: 'deny' }
   })
 
   buildMenu(mainWindow)
 
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  loadRenderer(
+    mainWindow,
+    {
+      devUrl: is.dev ? process.env['ELECTRON_RENDERER_URL'] : undefined,
+      file: join(__dirname, '../renderer/index.html')
+    },
+    (error) => {
+      console.error('Failed to load the renderer', error)
+      dialog.showErrorBox('MakeDiff', 'The app window failed to load. Please restart the app.')
+    }
+  )
 }
 
 const MENU_IDS = ['download-app', 'open-settings', 'about'] as const
@@ -69,7 +74,7 @@ function buildMenu(mainWindow: BrowserWindow): void {
         { type: 'separator' },
         {
           label: 'Open Releases Page',
-          click: () => shell.openExternal(RELEASES_URL)
+          click: () => openExternal(RELEASES_URL, (url) => shell.openExternal(url))
         },
         { type: 'separator' },
         process.platform === 'darwin' ? { role: 'close' } : { role: 'quit' }

@@ -71,5 +71,5 @@ export function buildJsonPathMap(content: string): Map<number, string> {
 }
 
 export function isValidDataUri(uri: string): boolean {
-  return /^data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+$/.test(uri)
+  return /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/.test(uri)
 }

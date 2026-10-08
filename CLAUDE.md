@@ -1,6 +1,6 @@
 # MakeDiff
 
-> **Always read `AGENT.md` before starting work.** It contains detailed architecture rules, IPM API reference, IPC channels, data flow patterns, and code conventions.
+> **Always read `AGENTS.md` before starting work.** It contains detailed architecture rules, IPM API reference, IPC channels, data flow patterns, and code conventions.
 
 Electron desktop app for viewing diffs between Make.com app versions.
 
@@ -50,6 +50,9 @@ All IPC handlers return `IpcResult<T>`:
 | `diff-service.ts` | Compare files between two versions (full-context unified diff) |
 | `decompiler.ts` | Custom app decompilation (compiled → SDK structure) |
 | `storage.ts` | Settings/theme persistence via electron-store |
+| `external-link.ts` | Open http(s) links in the browser; failed launches are logged |
+| `renderer-loader.ts` | Load the renderer (dev server or built file); a failed load is reported |
+| `concurrency.ts` | Per-request limiter for dependency downloads |
 
 ## Code Conventions
 

@@ -76,15 +76,30 @@ export function buildFlatList(root: TreeNode, expandedFolders: Set<string>): Fla
     for (const child of children) {
       const isFolder = child.children.size > 0
       const isExpanded = expandedFolders.has(child.fullPath)
+      // A path that is both a file and a folder (e.g. `icon` deleted, `icon/logo.png` added) gets a separate file row
+      if (isFolder && child.file) {
+        items.push({
+          key: `${child.fullPath}::file`,
+          isFolder: false,
+          name: child.name,
+          fullPath: child.fullPath,
+          depth,
+          diff: child.file,
+          folderStatus: null,
+          fileCount: 0,
+          isExpanded: false
+        })
+      }
+      const folderNode: TreeNode = child.file && isFolder ? { ...child, file: null } : child
       items.push({
         key: child.fullPath,
         isFolder,
         name: child.name,
         fullPath: child.fullPath,
         depth,
-        diff: child.file,
-        folderStatus: isFolder ? getFolderStatus(child) : null,
-        fileCount: isFolder ? countFiles(child) : 0,
+        diff: isFolder ? null : child.file,
+        folderStatus: isFolder ? getFolderStatus(folderNode) : null,
+        fileCount: isFolder ? countFiles(folderNode) : 0,
         isExpanded
       })
       if (isFolder && isExpanded) visit(child, depth + 1)

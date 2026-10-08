@@ -121,6 +121,29 @@ describe('computeDiff', () => {
       expect(result.summary.modified).toBe(1)
     })
 
+    it('keeps a __proto__ key so a change inside it is detected', () => {
+      const oldFiles: ExtractedFile[] = [{ path: 'data.json', content: '{"__proto__":{"value":1}}' }]
+      const newFiles: ExtractedFile[] = [{ path: 'data.json', content: '{"__proto__":{"value":2}}' }]
+      const result = computeDiff('app', oldFiles, newFiles)
+      expect(result.summary.modified).toBe(1)
+      expect(result.diffs[0].oldContent).toContain('"__proto__"')
+      expect(result.diffs[0].oldContent).toContain('"value": 1')
+      expect(result.diffs[0].newContent).toContain('"value": 2')
+    })
+
+    it('keeps a nested __proto__ key next to ordinary keys', () => {
+      const oldFiles: ExtractedFile[] = [{ path: 'data.json', content: '{"x":1,"a":{"__proto__":{"v":1}}}' }]
+      const result = computeDiff('app', oldFiles, [])
+      expect(result.diffs[0].oldContent).toContain('"__proto__"')
+      expect(result.diffs[0].oldContent.indexOf('"a"')).toBeLessThan(result.diffs[0].oldContent.indexOf('"x"'))
+    })
+
+    it('does not pollute Object.prototype through a __proto__ key', () => {
+      const oldFiles: ExtractedFile[] = [{ path: 'data.json', content: '{"__proto__":{"polluted":true}}' }]
+      computeDiff('app', oldFiles, [])
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    })
+
     it('returns original content when JSON is invalid', () => {
       const oldFiles: ExtractedFile[] = [{ path: 'bad.json', content: '{ invalid json' }]
       const newFiles: ExtractedFile[] = [{ path: 'bad.json', content: '{ different invalid' }]

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import type { FileDiff } from '../../preload/index'
 import { buildTree, buildFlatList } from '../utils/file-tree'
+import { onActivateKey } from '../utils/keyboard'
 
 interface FileTreeProps {
   diffs: FileDiff[]
@@ -143,18 +144,24 @@ export default function FileTree({
       <div className="file-tree-header">
         {viewMode === 'show' ? 'Files' : 'Changed files'} ({diffs.length})
       </div>
-      <ul className="file-list">
+      <ul className="file-list" role="tree">
         {flatItems.map((item) => {
           const isSelected = !item.isFolder && item.diff && selectedFile === item.diff.filePath
+          const activate = (): void => {
+            if (item.isFolder) toggleFolder(item.fullPath)
+            else if (item.diff) onFileSelect(item.diff.filePath)
+          }
 
           return (
             <li
               key={item.key}
               className={`tree-item ${isSelected ? 'selected' : ''}`}
-              onClick={() => {
-                if (item.isFolder) toggleFolder(item.fullPath)
-                else if (item.diff) onFileSelect(item.diff.filePath)
-              }}
+              role="treeitem"
+              tabIndex={0}
+              aria-expanded={item.isFolder ? item.isExpanded : undefined}
+              aria-selected={item.isFolder ? undefined : !!isSelected}
+              onClick={activate}
+              onKeyDown={onActivateKey(activate)}
             >
               {/* Indent guides */}
               <span className="tree-indent" style={{ width: item.depth * 16 }}>
@@ -179,7 +186,10 @@ export default function FileTree({
                 <>
                   <span className="tree-icon-spacer" />
                   <span className="tree-icon-svg">{getFileIcon(item.name)}</span>
-                  <span className="tree-label" style={{ color: statusColors[item.diff!.status] }}>
+                  <span
+                    className="tree-label"
+                    style={item.diff ? { color: statusColors[item.diff.status] } : undefined}
+                  >
                     {item.name}
                   </span>
                 </>

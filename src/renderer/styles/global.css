@@ -713,6 +713,12 @@ body {
   background: var(--bg-hover);
 }
 
+.tree-item:focus-visible,
+.sidebar-app-item:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .tree-item.selected {
   background: var(--bg-surface);
 }

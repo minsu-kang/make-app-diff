@@ -42,8 +42,11 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
       .then((result) => {
         if (result.success && result.data) {
           setAllApps(result.data)
+        } else {
+          setMessage(`Error: ${result.error || 'Failed to load apps'}`)
         }
       })
+      .catch((err: unknown) => setMessage(`Error: ${err instanceof Error ? err.message : String(err)}`))
       .finally(() => setLoadingApps(false))
   }, [])
 

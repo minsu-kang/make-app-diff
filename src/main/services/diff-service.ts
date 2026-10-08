@@ -70,7 +70,8 @@ function sortKeysRecursive(obj: unknown, order?: KeyOrder): unknown {
       sortedKeys = [...keys].sort()
     }
 
-    const sorted: Record<string, unknown> = {}
+    // Null prototype so a parsed `__proto__` key stays an own property instead of hitting the prototype setter
+    const sorted: Record<string, unknown> = Object.create(null)
     for (const key of sortedKeys) {
       sorted[key] = sortKeysRecursive(record[key], order?.children?.[key])
     }

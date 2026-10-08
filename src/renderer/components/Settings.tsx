@@ -34,12 +34,14 @@ export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
   const initialTheme = useRef<string>('')
 
   useEffect(() => {
-    Promise.all([window.api.settings.load(), window.api.theme.load()]).then(([loadedSettings, loadedTheme]) => {
-      setSettings(loadedSettings)
-      setTheme(loadedTheme)
-      initialSettings.current = { ...loadedSettings }
-      initialTheme.current = loadedTheme
-    })
+    Promise.all([window.api.settings.load(), window.api.theme.load()])
+      .then(([loadedSettings, loadedTheme]) => {
+        setSettings(loadedSettings)
+        setTheme(loadedTheme)
+        initialSettings.current = { ...loadedSettings }
+        initialTheme.current = loadedTheme
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
   }, [])
 
   const isDirty = (): boolean => {
@@ -72,7 +74,7 @@ export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
       }
       if (e.key === 'Enter' && !saving) {
         const active = document.activeElement
-        if (active && active.tagName === 'SELECT') return
+        if (active?.closest('button, select')) return
         handleSave()
       }
     }

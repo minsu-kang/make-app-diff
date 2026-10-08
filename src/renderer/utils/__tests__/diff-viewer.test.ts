@@ -79,6 +79,14 @@ describe('isValidDataUri', () => {
     expect(isValidDataUri('data:image/jpeg;base64,/9j/4AAQ==')).toBe(true)
   })
 
+  it('accepts ICO data URI with a hyphenated subtype', () => {
+    expect(isValidDataUri('data:image/x-icon;base64,AAABAAEA')).toBe(true)
+  })
+
+  it('accepts subtypes with digits and dots', () => {
+    expect(isValidDataUri('data:image/vnd.microsoft.icon;base64,AAABAAEA')).toBe(true)
+  })
+
   it('rejects non-image data URI', () => {
     expect(isValidDataUri('data:text/plain;base64,aGVsbG8=')).toBe(false)
   })

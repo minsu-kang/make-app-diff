@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockGet = vi.fn()
 const mockSet = vi.fn()
@@ -31,7 +31,9 @@ import {
   loadFavorites,
   saveFavorites,
   loadRecentApps,
-  saveRecentApps
+  saveRecentApps,
+  isSessionExpired,
+  clearTokens
 } from '../storage'
 
 beforeEach(() => {
@@ -154,5 +156,72 @@ describe('saveRecentApps', () => {
     const recent = [{ name: 'jira', label: 'Jira', major: 1, lastViewed: 1711929600000 }]
     saveRecentApps(recent)
     expect(mockSet).toHaveBeenCalledWith('recentApps', recent)
+  })
+})
+
+describe('isSessionExpired', () => {
+  const HOUR = 60 * 60 * 1000
+  const now = new Date('2026-01-10T12:00:00Z').getTime()
+
+  // Only the lastActiveAt key returns the value, so reading another key makes these tests fail
+  const lastActiveAt = (value: number | undefined): void => {
+    mockGet.mockImplementation((key: string) => (key === 'lastActiveAt' ? value : undefined))
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    mockGet.mockReset()
+  })
+
+  it('is not expired when no activity was recorded', () => {
+    lastActiveAt(0)
+    expect(isSessionExpired()).toBe(false)
+  })
+
+  it('is not expired when lastActiveAt is unset', () => {
+    lastActiveAt(undefined)
+    expect(isSessionExpired()).toBe(false)
+  })
+
+  it('is not expired within 48 hours', () => {
+    lastActiveAt(now - 47 * HOUR)
+    expect(isSessionExpired()).toBe(false)
+  })
+
+  it('is not expired at exactly 48 hours', () => {
+    lastActiveAt(now - 48 * HOUR)
+    expect(isSessionExpired()).toBe(false)
+  })
+
+  it('is expired just after 48 hours', () => {
+    lastActiveAt(now - 48 * HOUR - 1)
+    expect(isSessionExpired()).toBe(true)
+  })
+})
+
+describe('clearTokens', () => {
+  it('blanks both tokens, keeps the other settings and resets lastActiveAt', () => {
+    mockGet.mockReturnValueOnce({
+      host: 'ipm.integromat.com',
+      ipmToken: 'tok',
+      ipmeToken: 'etok',
+      env: 'production',
+      ipmVersion: '4.0.0'
+    })
+    clearTokens()
+    expect(mockSet).toHaveBeenNthCalledWith(1, 'settings', {
+      host: 'ipm.integromat.com',
+      ipmToken: '',
+      ipmeToken: '',
+      env: 'production',
+      ipmVersion: '4.0.0'
+    })
+    expect(mockSet).toHaveBeenNthCalledWith(2, 'lastActiveAt', 0)
+    expect(mockSet).toHaveBeenCalledTimes(2)
   })
 })

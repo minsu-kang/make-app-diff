@@ -153,4 +153,45 @@ describe('buildFlatList', () => {
     expect(items[0].folderStatus).toBe('added')
     expect(items[0].fileCount).toBe(2)
   })
+
+  describe('a path that is both a file and a folder', () => {
+    const diffs = [makeDiff('assets/icon', 'deleted'), makeDiff('assets/icon/logo.png', 'added')]
+
+    it('emits a selectable file row and a folder row with distinct keys', () => {
+      const items = buildFlatList(buildTree(diffs), new Set(['assets']))
+      expect(items.map((i) => [i.key, i.isFolder])).toEqual([
+        ['assets', true],
+        ['assets/icon::file', false],
+        ['assets/icon', true]
+      ])
+      const file = items[1]
+      expect(file.diff?.filePath).toBe('assets/icon')
+      expect(file.diff?.status).toBe('deleted')
+      expect(file.depth).toBe(1)
+    })
+
+    it('keeps the file diff off the folder row and counts only the folder contents', () => {
+      const items = buildFlatList(buildTree(diffs), new Set(['assets']))
+      const folder = items[2]
+      expect(folder.diff).toBeNull()
+      expect(folder.fileCount).toBe(1)
+      expect(folder.folderStatus).toBe('added')
+    })
+
+    it('shows the folder children after the folder row when it is expanded', () => {
+      const items = buildFlatList(buildTree(diffs), new Set(['assets', 'assets/icon']))
+      expect(items.map((i) => i.key)).toEqual(['assets', 'assets/icon::file', 'assets/icon', 'assets/icon/logo.png'])
+    })
+
+    it('makes every changed path reachable by selection', () => {
+      const items = buildFlatList(buildTree(diffs), new Set(['assets', 'assets/icon']))
+      const selectable = items.filter((i) => !i.isFolder && i.diff).map((i) => i.diff!.filePath)
+      expect(selectable.sort()).toEqual(['assets/icon', 'assets/icon/logo.png'])
+    })
+
+    it('behaves the same when the folder entry comes before the file entry', () => {
+      const items = buildFlatList(buildTree([...diffs].reverse()), new Set(['assets']))
+      expect(items.map((i) => i.key)).toEqual(['assets', 'assets/icon::file', 'assets/icon'])
+    })
+  })
 })
