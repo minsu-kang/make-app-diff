@@ -10,7 +10,7 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 2. `npm run dev` to start — uses electron-vite with HMR for renderer
 3. Main/preload changes require app restart; renderer changes hot reload
 4. Commit with Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
-5. Push and create PR to main → CI runs (lint, format, test, coverage)
+5. Push and create PR to master → CI runs (lint, format, test, coverage)
 6. Merge → release-please auto-creates Release PR with CHANGELOG + version bump
 7. Build output goes to `out/` directory
 
@@ -324,12 +324,12 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push to main, PR to main | Jobs `lint`, `format`, `typecheck`, `unit` (vitest with coverage thresholds), `build`. Each job is a required check in mono |
+| `ci.yml` | push to master, PR to master | Jobs `lint`, `format`, `typecheck`, `unit` (vitest with coverage thresholds), `build`. Each job is a required check in mono |
 | `pr-validate.yml` | PR opened/edited | PR title must follow Conventional Commits |
-| `release-please.yml` | push to main, workflow_dispatch | CHANGELOG + version bump + DMG/EXE build |
+| `release-please.yml` | push to master, workflow_dispatch | CHANGELOG + version bump + DMG/EXE build |
 
 **Release flow:**
-1. Merge PR to main → release-please creates Release PR (CHANGELOG.md + version bump)
+1. Merge PR to master → release-please creates Release PR (CHANGELOG.md + version bump)
 2. Merge Release PR → GitHub Release created → `build-mac` + `build-win` jobs run in parallel
 3. DMG + EXE uploaded to Release assets
 
