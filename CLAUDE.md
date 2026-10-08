@@ -7,6 +7,7 @@ Electron desktop app for viewing diffs between Make.com app versions.
 ## Tech Stack
 
 - **Electron** 43.4.1 + **React** ^18.3 + **TypeScript** ^5.5
+- **Node** 24 for local development and every CI job
 - **electron-vite** ^2.3 (build), **monaco-editor** + **@monaco-editor/react** (diff rendering), **electron-store** (persistent storage)
 - macOS (hiddenInset title bar) + Windows (NSIS installer)
 
@@ -23,6 +24,7 @@ npm run format:check # Check formatting
 npm run typecheck    # Type check node and web projects with tsc
 npm run test         # Run tests (vitest)
 npm run test:coverage # Run tests with coverage report
+npm run test:integration # Run IPC integration tests (faked IPM server)
 npm run test:watch   # Run tests in watch mode
 npm run postinstall  # Install Electron app deps (runs automatically)
 ```

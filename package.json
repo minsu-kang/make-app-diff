@@ -17,6 +17,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false --incremental false",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -34,7 +35,7 @@
     "@eslint/js": "9.39.4",
     "@types/archiver": "7.0.0",
     "@types/diff": "5.2.3",
-    "@types/node": "20.19.35",
+    "@types/node": "24.19.1",
     "@types/react": "18.3.28",
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "4.7.0",
@@ -46,6 +47,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "5.2.0",
+    "nock": "14.0.17",
     "prettier": "3.8.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",

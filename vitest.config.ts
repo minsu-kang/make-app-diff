@@ -8,6 +8,7 @@ export default defineConfig({
       'src/main/services/__tests__/**/*.test.ts',
       'src/renderer/utils/__tests__/**/*.test.ts'
     ],
+    exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
