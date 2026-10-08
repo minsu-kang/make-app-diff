@@ -3,7 +3,7 @@ name: PR Validate
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-    branches: [main]
+    branches: [main, master]
 
 permissions:
   pull-requests: read
