@@ -20,6 +20,7 @@ npm run lint         # Run ESLint
 npm run lint:fix     # Run ESLint with auto-fix
 npm run format       # Format code with Prettier
 npm run format:check # Check formatting
+npm run typecheck    # Type check node and web projects with tsc
 npm run test         # Run tests (vitest)
 npm run test:coverage # Run tests with coverage report
 npm run test:watch   # Run tests in watch mode
