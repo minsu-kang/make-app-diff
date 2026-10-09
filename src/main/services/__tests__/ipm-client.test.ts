@@ -231,3 +231,41 @@ describe('downloadDependencyComponent', () => {
     expect(mockGet).toHaveBeenCalledWith('/v3/sync/hook/hook-name/3.0.0', { responseType: 'arraybuffer' })
   })
 })
+
+describe('request paths', () => {
+  const traversal = '../admin'
+
+  it.each([
+    ['getAppInfo', (c: IpmClient) => c.getAppInfo(traversal), 'appName'],
+    ['getManifest app name', (c: IpmClient) => c.getManifest(traversal, '1.0.0'), 'appName'],
+    ['getManifest version', (c: IpmClient) => c.getManifest('app', '1.0.0/..'), 'version'],
+    ['getAppIcon', (c: IpmClient) => c.getAppIcon('app?x=1'), 'appName'],
+    ['downloadComponent app name', (c: IpmClient) => c.downloadComponent('a/b', '1.0.0', 'app'), 'appName'],
+    ['downloadComponent version', (c: IpmClient) => c.downloadComponent('app', '..', 'app'), 'version'],
+    ['downloadComponent type', (c: IpmClient) => c.downloadComponent('app', '1.0.0', '../x' as never), 'type'],
+    [
+      'downloadDependencyComponent name',
+      (c: IpmClient) => c.downloadDependencyComponent('a#b', '1.0.0', 'hook'),
+      'name'
+    ],
+    [
+      'downloadDependencyComponent version',
+      (c: IpmClient) => c.downloadDependencyComponent('conn', '1 0', 'account'),
+      'version'
+    ]
+  ])('%s rejects a segment that changes the path, without a request', async (_label, call, field) => {
+    const client = new IpmClient(makeSettings())
+
+    await expect(call(client)).rejects.toThrow(`Invalid ${field}`)
+    expect(mockGet).not.toHaveBeenCalled()
+  })
+
+  it('encodes what it lets through', async () => {
+    mockGet.mockResolvedValueOnce({ data: {} })
+    const client = new IpmClient(makeSettings())
+
+    await client.getAppInfo('acme@1.0')
+
+    expect(mockGet).toHaveBeenCalledWith('/v3/info/acme%401.0')
+  })
+})

@@ -57,6 +57,7 @@ All IPC handlers return `IpcResult<T>`:
 | `renderer-loader.ts` | Load the renderer (dev server or built file); a failed load is reported |
 | `concurrency.ts` | Per-request limiter for dependency downloads |
 | `ipm-base-url.ts` | Validates the E2E-only `MAKEDIFF_IPM_URL` override (unpackaged app, local http URL) |
+| `path-segment.ts` | `assertPathSegment`: only plain names and versions go into local folders and IPM request paths |
 
 ## Code Conventions
 

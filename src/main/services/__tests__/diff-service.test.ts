@@ -78,6 +78,21 @@ describe('computeDiff', () => {
     expect(paths).toEqual(['a.txt', 'm.txt', 'z.txt'])
   })
 
+  it('sorts by character code, not by locale', () => {
+    const newFiles: ExtractedFile[] = ['é.txt', 'b.txt', 'B.txt', '10.txt', '9.txt', 'a.txt'].map((path) => ({
+      path,
+      content: 'x'
+    }))
+    const result = computeDiff('app', [], newFiles)
+    expect(result.diffs.map((d) => d.filePath)).toEqual(['10.txt', '9.txt', 'B.txt', 'a.txt', 'b.txt', 'é.txt'])
+  })
+
+  it('sorts JSON keys by character code, not by locale, when no key order applies', () => {
+    const content = JSON.stringify({ é: 1, b: 2, B: 3, '10a': 4, '9a': 5, a: 6 })
+    const result = computeDiff('app', [], [{ path: 'config.json', content }])
+    expect(Object.keys(JSON.parse(result.diffs[0].newContent))).toEqual(['10a', '9a', 'B', 'a', 'b', 'é'])
+  })
+
   it('preserves old and new content in diff entries', () => {
     const oldFiles: ExtractedFile[] = [{ path: 'f.txt', content: 'old' }]
     const newFiles: ExtractedFile[] = [{ path: 'f.txt', content: 'new' }]

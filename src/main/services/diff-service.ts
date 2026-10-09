@@ -51,6 +51,12 @@ const IMLJSON_KEY_ORDER: KeyOrder = {
   }
 }
 
+/** Same order as the default `sort()`, which compares UTF-16 code units, and unlike `localeCompare` it never varies by locale */
+function byCodeUnit(a: string, b: string): number {
+  if (a < b) return -1
+  return a > b ? 1 : 0
+}
+
 function sortKeysRecursive(obj: unknown, order?: KeyOrder): unknown {
   if (Array.isArray(obj)) return obj.map((item) => sortKeysRecursive(item, order))
   if (obj !== null && typeof obj === 'object') {
@@ -67,7 +73,7 @@ function sortKeysRecursive(obj: unknown, order?: KeyOrder): unknown {
         return a.localeCompare(b)
       })
     } else {
-      sortedKeys = [...keys].sort()
+      sortedKeys = [...keys].sort(byCodeUnit)
     }
 
     // Null prototype so a parsed `__proto__` key stays an own property instead of hitting the prototype setter
@@ -99,7 +105,7 @@ export function computeDiff(type: ComponentType, oldFiles: ExtractedFile[], newF
   const allPaths = new Set([...oldMap.keys(), ...newMap.keys()])
   const diffs: FileDiff[] = []
 
-  for (const filePath of Array.from(allPaths).sort()) {
+  for (const filePath of Array.from(allPaths).sort(byCodeUnit)) {
     let oldContent = oldMap.get(filePath) ?? ''
     let newContent = newMap.get(filePath) ?? ''
 

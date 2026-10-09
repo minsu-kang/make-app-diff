@@ -1,5 +1,12 @@
 import axios, { AxiosInstance } from 'axios'
 import { IpmSettings, AppInfo, AppManifest, SearchAppResult, ComponentType } from '../types'
+import { assertPathSegment } from './path-segment'
+
+/** Names and versions reach this client from the renderer: only plain segments go into a request path */
+function segment(value: unknown, name: string): string {
+  assertPathSegment(value, name)
+  return encodeURIComponent(value)
+}
 
 function getActiveToken(settings: IpmSettings): string {
   return settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
@@ -54,31 +61,37 @@ export class IpmClient {
   }
 
   async getAppInfo(appName: string): Promise<AppInfo> {
-    const response = await this.client.get(`/v3/info/${appName}`)
+    const response = await this.client.get(`/v3/info/${segment(appName, 'appName')}`)
     return response.data
   }
 
   async getManifest(appName: string, version: string): Promise<AppManifest> {
-    const response = await this.client.get(`/manifest/app/${appName}/${version}`)
+    const response = await this.client.get(
+      `/manifest/app/${segment(appName, 'appName')}/${segment(version, 'version')}`
+    )
     return response.data
   }
 
   async getAppIcon(appName: string): Promise<Buffer> {
-    const response = await this.client.get(`/admin/icon/apps/${appName}`, {
+    const response = await this.client.get(`/admin/icon/apps/${segment(appName, 'appName')}`, {
       responseType: 'arraybuffer'
     })
     return Buffer.from(response.data)
   }
 
   async downloadDependencyComponent(name: string, version: string, type: 'account' | 'hook'): Promise<Buffer> {
-    const response = await this.client.get(`/v3/sync/${type}/${name}/${version}`, { responseType: 'arraybuffer' })
+    const response = await this.client.get(
+      `/v3/sync/${segment(type, 'type')}/${segment(name, 'name')}/${segment(version, 'version')}`,
+      { responseType: 'arraybuffer' }
+    )
     return Buffer.from(response.data)
   }
 
   async downloadComponent(appName: string, version: string, type: ComponentType): Promise<Buffer> {
-    const response = await this.client.get(`/v3/sync/${type}/${appName}/${version}`, {
-      responseType: 'arraybuffer'
-    })
+    const response = await this.client.get(
+      `/v3/sync/${segment(type, 'type')}/${segment(appName, 'appName')}/${segment(version, 'version')}`,
+      { responseType: 'arraybuffer' }
+    )
     return Buffer.from(response.data)
   }
 }

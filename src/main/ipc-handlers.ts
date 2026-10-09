@@ -10,6 +10,7 @@ import { IpmClient } from './services/ipm-client'
 import { extractPkr, toFileData } from './services/pkr-extractor'
 import { computeDiff } from './services/diff-service'
 import { createLimiter, type Limiter } from './services/concurrency'
+import { assertPathSegment } from './services/path-segment'
 import {
   loadSettings,
   saveSettings,
@@ -46,13 +47,6 @@ function compareSemverDesc(a: string, b: string): number {
 function assertNumber(value: unknown, name: string): asserts value is number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`Invalid ${name}: expected finite number`)
-  }
-}
-
-// Rejects path separators and `..`/`.` so appName/version can't escape the tmpdir prefix via path.join
-function assertPathSegment(value: unknown, name: string): asserts value is string {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9._@-]+$/.test(value) || value === '.' || value === '..') {
-    throw new Error(`Invalid ${name}`)
   }
 }
 

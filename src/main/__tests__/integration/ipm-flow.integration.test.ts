@@ -184,6 +184,31 @@ describe('app catalog', () => {
     expect(result).toEqual({ success: false, error: 'Invalid appName: expected non-empty string' })
   })
 
+  it('rejects names and versions that would change the request path, without calling the server', async () => {
+    await startApp()
+    await connect()
+
+    const info = await invoke<IpcResult<AppInfo>>('ipm:get-app-info', '../admin/secret')
+    const icon = await invoke<IpcResult<string>>('ipm:get-app-icon', 'slack?x=1')
+    const download = await invoke<IpcResult<unknown>>('ipm:download-and-extract', 'slack', '..', 'module')
+
+    expect(info).toEqual({ success: false, error: 'Invalid appName' })
+    expect(icon).toEqual({ success: false, error: 'Invalid appName' })
+    expect(download).toEqual({ success: false, error: 'Invalid version' })
+  })
+
+  it('looks the app up, then rejects a version that would change the manifest path', async () => {
+    await startApp()
+    await connect()
+    ipm()
+      .get('/v3/info/slack')
+      .reply(200, { name: 'slack', version: '2.0.0', versions: ['1.0.0', '2.0.0'] })
+
+    const result = await invoke<IpcResult<AppInfo>>('ipm:get-app-info', 'slack', '1.0.0/../2.0.0')
+
+    expect(result).toEqual({ success: false, error: 'Invalid version' })
+  })
+
   it('returns the icon as a data URL and detects SVG', async () => {
     await startApp()
     await connect()
