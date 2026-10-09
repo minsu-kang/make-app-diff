@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.3](https://github.com/integromat/make-app-diff/compare/v1.7.2...v1.7.3) (2026-10-09)
+
+
+### Bug Fixes
+
+* check IPM request path segments and handle the Sonar findings ([#10](https://github.com/integromat/make-app-diff/issues/10)) ([bd1dabf](https://github.com/integromat/make-app-diff/commit/bd1dabfad1732410b707f217c9846a08cf0d79f1))
+
 ## [1.7.2](https://github.com/integromat/make-app-diff/compare/v1.7.1...v1.7.2) (2026-10-09)
 
 
