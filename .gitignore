@@ -18,8 +18,10 @@ dist/
 .env
 .env.local
 
-# Test coverage
+# Test coverage and reports
 coverage/
+test-results/
+playwright-report/
 
 # Electron
 *.dmg

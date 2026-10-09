@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
+import { resolveIpmBaseUrl } from './services/ipm-base-url'
 import { isWebUrl, openExternal } from './services/external-link'
 import { loadRenderer } from './services/renderer-loader'
 
@@ -106,7 +107,7 @@ export function disableMenuItems(): void {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers()
+  registerIpcHandlers({ ipmBaseUrl: resolveIpmBaseUrl(app.isPackaged, process.env) })
   createWindow()
 
   app.on('activate', () => {

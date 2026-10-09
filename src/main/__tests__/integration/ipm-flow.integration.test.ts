@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import nock from 'nock'
 import type { AppInfo, FavoriteApp, IpcResult, IpmSettings, RecentApp, SearchAppResult } from '../../types'
 import { PNG, PROD_HOST, connect, invoke, ipm, settings, spies, startApp } from './harness'
 
@@ -72,6 +73,34 @@ describe('settings and session', () => {
 
     expect(await invoke('session:check')).toEqual({ expired: false })
     expect((await invoke<IpmSettings>('settings:load')).ipmToken).toBe('token-prod')
+  })
+})
+
+describe('IPM base URL override', () => {
+  const BASE_URL = 'http://127.0.0.1:4010'
+
+  it('uses it for the client that exists right after start, before any settings are saved', async () => {
+    await startApp({ ipmBaseUrl: BASE_URL })
+    nock(BASE_URL).get('/search/apps').reply(200, [])
+
+    expect(await invoke('ipm:search-apps')).toEqual({ success: true, data: [] })
+  })
+
+  it('sends every request to the given base URL, also after the session expired', async () => {
+    await startApp({ ipmBaseUrl: BASE_URL })
+    nock(BASE_URL).get('/v3/info/google-drive').reply(200, {})
+    nock(BASE_URL).get('/search/apps').matchHeader('x-imt-token', 'token-prod').reply(200, [])
+    expect(await invoke('settings:save', settings)).toEqual({ success: true })
+    expect(await invoke('ipm:search-apps')).toEqual({ success: true, data: [] })
+
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 49 * HOUR })
+    expect(await invoke('session:check')).toEqual({ expired: true })
+    nock(BASE_URL)
+      .get('/search/apps')
+      .matchHeader('x-imt-token', (token) => token === '')
+      .reply(200, [])
+
+    expect(await invoke('ipm:search-apps')).toEqual({ success: true, data: [] })
   })
 })
 

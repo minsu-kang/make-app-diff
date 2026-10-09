@@ -215,15 +215,17 @@ function applyDepsDecompile(
 }
 
 let ipmClient: IpmClient
+let ipmBaseUrl: string | undefined
 
-export function registerIpcHandlers(): void {
+export function registerIpcHandlers(options: { ipmBaseUrl?: string } = {}): void {
+  ipmBaseUrl = options.ipmBaseUrl
   const settings = loadSettings()
-  ipmClient = new IpmClient(settings)
+  ipmClient = new IpmClient(settings, ipmBaseUrl)
 
   ipcMain.handle('session:check', () => {
     if (isSessionExpired()) {
       clearTokens()
-      ipmClient = new IpmClient(loadSettings())
+      ipmClient = new IpmClient(loadSettings(), ipmBaseUrl)
       clearCaches()
       disableMenuItems()
       return { expired: true }
@@ -253,7 +255,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('settings:save', async (_event, settings: IpmSettings) => {
-    const testClient = new IpmClient(settings)
+    const testClient = new IpmClient(settings, ipmBaseUrl)
     try {
       await testClient.testConnection()
     } catch (error: unknown) {

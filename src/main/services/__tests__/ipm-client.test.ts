@@ -25,6 +25,16 @@ function makeSettings(overrides: Partial<IpmSettings> = {}): IpmSettings {
 }
 
 describe('IpmClient constructor', () => {
+  it('uses a given base URL instead of https plus the host, also after updateSettings', () => {
+    const client = new IpmClient(makeSettings(), 'http://127.0.0.1:4010')
+    client.updateSettings(makeSettings({ host: 'ipme.integromat.com' }))
+
+    expect(mockAxiosCreate.mock.calls.map(([config]) => config?.baseURL)).toEqual([
+      'http://127.0.0.1:4010',
+      'http://127.0.0.1:4010'
+    ])
+  })
+
   it('creates axios client with correct baseURL and headers for ipm host', () => {
     new IpmClient(makeSettings())
     expect(mockAxiosCreate).toHaveBeenCalledWith({

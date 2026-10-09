@@ -25,6 +25,7 @@ npm run typecheck    # Type check node and web projects with tsc
 npm run test         # Run tests (vitest)
 npm run test:coverage # Run tests with coverage report
 npm run test:integration # Run IPC integration tests (faked IPM server)
+npm run test:e2e     # Build, then run the Playwright Electron tests (opens real windows)
 npm run test:watch   # Run tests in watch mode
 npm run postinstall  # Install Electron app deps (runs automatically)
 ```
@@ -55,6 +56,7 @@ All IPC handlers return `IpcResult<T>`:
 | `external-link.ts` | Open http(s) links in the browser; failed launches are logged |
 | `renderer-loader.ts` | Load the renderer (dev server or built file); a failed load is reported |
 | `concurrency.ts` | Per-request limiter for dependency downloads |
+| `ipm-base-url.ts` | Validates the E2E-only `MAKEDIFF_IPM_URL` override (unpackaged app, local http URL) |
 
 ## Code Conventions
 

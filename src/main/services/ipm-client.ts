@@ -8,13 +8,16 @@ function getActiveToken(settings: IpmSettings): string {
 export class IpmClient {
   private client: AxiosInstance
 
-  constructor(private settings: IpmSettings) {
+  constructor(
+    private settings: IpmSettings,
+    private baseUrl?: string
+  ) {
     this.client = this.createClient(settings)
   }
 
   private createClient(settings: IpmSettings): AxiosInstance {
     return axios.create({
-      baseURL: `https://${settings.host}`,
+      baseURL: this.baseUrl ?? `https://${settings.host}`,
       timeout: 30000,
       headers: {
         'x-imt-token': getActiveToken(settings),

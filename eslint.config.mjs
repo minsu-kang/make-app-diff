@@ -28,6 +28,14 @@ export default tseslint.config(
     }
   },
   {
+    // Playwright fixtures name their callback `use`, which the hooks rule mistakes for a React hook
+    files: ['src/e2e/**/*.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'no-empty-pattern': 'off'
+    }
+  },
+  {
     files: ['src/**/__tests__/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off'

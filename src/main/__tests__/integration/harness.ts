@@ -162,10 +162,10 @@ afterEach(async () => {
 })
 
 /** Fresh module state (caches, client) for every test, then registers the real IPC handlers */
-export async function startApp(): Promise<void> {
+export async function startApp(options: { ipmBaseUrl?: string } = {}): Promise<void> {
   vi.resetModules()
   const { registerIpcHandlers } = await import('../../ipc-handlers')
-  registerIpcHandlers()
+  registerIpcHandlers(options)
 }
 
 export async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
