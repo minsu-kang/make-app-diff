@@ -22,7 +22,7 @@ npm run lint:fix     # Run ESLint with auto-fix
 npm run format       # Format code with Prettier
 npm run format:check # Check formatting
 npm run typecheck    # Type check node and web projects with tsc
-npm run test         # Run tests (vitest)
+npm run test         # Run unit tests (vitest: node project for main/utils, jsdom project for the renderer)
 npm run test:coverage # Run tests with coverage report
 npm run test:integration # Run IPC integration tests (faked IPM server)
 npm run test:e2e     # Build, then run the Playwright Electron tests (opens real windows)
@@ -73,6 +73,7 @@ All IPC handlers return `IpcResult<T>`:
 - `src/main/ipc-handlers.ts` — All IPC channel registration
 - `src/preload/index.ts` — Exposes `window.api`, `window.appVersion`, `window.onMenu`
 - `src/renderer/App.tsx` — Root component, state management
+- `src/renderer/__tests__/setup.ts` and `mocks/` — jsdom test setup: typed `window.api` fake and Monaco fakes
 - `src/renderer/monaco-setup.ts` — Monaco worker config, loader, language/theme registration
 - `src/renderer/languages/imljson.ts` — IMLJSON Monarch tokenizer (JSON + IML `{{expressions}}`)
 - `src/renderer/themes/monaco-themes.ts` — 3 Monaco themes (dark/make/light)
