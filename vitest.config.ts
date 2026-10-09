@@ -11,7 +11,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json-summary'],
+      reporter: ['text', 'json-summary', 'lcov'],
       include: ['src/main/services/**/*.ts', 'src/renderer/utils/**/*.ts'],
       exclude: ['src/main/services/__tests__/**', 'src/renderer/utils/__tests__/**'],
       thresholds: {

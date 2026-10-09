@@ -20,6 +20,7 @@ dist/
 
 # Test coverage and reports
 coverage/
+coverage-integration/
 test-results/
 playwright-report/
 
