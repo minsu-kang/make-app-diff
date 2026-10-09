@@ -4,7 +4,7 @@ import { parseCompiledJs, parseFunctions } from './decompiler-sandbox'
 // Scalar fields that belong in base.imljson (common across all modules). `method` is
 // deliberately excluded: it must never be promoted to base or stripped from any
 // module/step, regardless of whether it matches — every component keeps its own.
-const BASE_TOP_FIELDS = ['baseUrl', 'timeout', 'body']
+const BASE_TOP_FIELDS = new Set(['baseUrl', 'timeout', 'body'])
 // Root-level fields with their own dedicated nested-aware extraction below (response's
 // error/valid/temp sub-handling, temp's own extraction, body's scalar-vs-object handling
 // via BASE_TOP_FIELDS above); excluded from the generic per-key composite-field
@@ -82,23 +82,23 @@ interface ModuleDef {
   rawItem: Record<string, unknown>
 }
 
-function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[] {
-  const result: ExtractedFile[] = []
+// Shared by the per-module and per-RPC emitters; the module loop fills moduleCleanedApis for the RPC loop
+interface AppContext {
+  appName: string
+  baseConfig: Record<string, unknown>
+  moduleCleanedApis: Record<string, unknown>
+  webhookNames: Set<string>
+}
 
+function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[] {
   const manifestFile = files.find((f) => f.path === 'manifest.json')
   if (!manifestFile) return files
   const manifest = JSON.parse(manifestFile.content)
 
-  // .sdk
-  result.push(makeFile('.sdk', { version: 2 }))
-
-  // metadata.json — top-level fields + SDK version
-  const metadata: Record<string, unknown> = {}
-  for (const key of ['name', 'label', 'description', 'theme']) {
-    if (manifest[key] !== undefined) metadata[key] = manifest[key]
-  }
-  metadata.version = 2
-  result.push(makeFile('metadata.json', metadata))
+  const result: ExtractedFile[] = [
+    makeFile('.sdk', { version: 2 }),
+    makeFile('metadata.json', buildAppMetadata(manifest))
+  ]
 
   // groups.imljson
   if (manifest.groups && manifest.groups.length > 0) {
@@ -106,52 +106,12 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
   }
 
   // Parse compiled JS files
-  const appJsFile = files.find((f) => f.path === 'lib/app.js')
-  const moduleApis = appJsFile ? parseCompiledJs(appJsFile.content) : {}
+  const moduleApis = parseJsFile(files, 'lib/app.js', parseCompiledJs)
+  const rpcApis = parseJsFile(files, 'lib/rpc.js', parseCompiledJs)
+  const endpointApis = parseJsFile(files, 'lib/endpoints.js', parseCompiledJs)
+  const functions = parseJsFile(files, 'lib/functions.js', parseFunctions)
 
-  const rpcJsFile = files.find((f) => f.path === 'lib/rpc.js')
-  const rpcApis = rpcJsFile ? parseCompiledJs(rpcJsFile.content) : {}
-
-  const endpointsJsFile = files.find((f) => f.path === 'lib/endpoints.js')
-  const endpointApis = endpointsJsFile ? parseCompiledJs(endpointsJsFile.content) : {}
-
-  const functionsJsFile = files.find((f) => f.path === 'lib/functions.js')
-  const functions = functionsJsFile ? parseFunctions(functionsJsFile.content) : {}
-
-  // Collect module definitions from manifest
-  const modules: ModuleDef[] = []
-
-  for (const [section, moduleType] of [
-    ['actions', 'action'],
-    ['searches', 'search'],
-    ['triggers', 'trigger']
-  ] as const) {
-    for (const item of manifest[section] || []) {
-      let type = moduleType as string
-      let connection: string | null = null
-      let webhook: string | null = null
-
-      // Extract connection/webhook reference from first parameter
-      const firstParam = (item.parameters || [])[0] as Record<string, unknown> | undefined
-      if (firstParam) {
-        const paramType = (firstParam.type as string) || ''
-        if (firstParam.name === '__IMTCONN__' && paramType.startsWith('account:')) {
-          connection = paramType.replace('account:', '')
-        } else if (firstParam.name === '__IMTHOOK__' && paramType.startsWith('hook:')) {
-          webhook = paramType.replace('hook:', '')
-          type = 'instant_trigger'
-        }
-      }
-
-      modules.push({
-        name: item.name,
-        type,
-        connection,
-        webhook,
-        rawItem: item
-      })
-    }
-  }
+  const modules = collectModuleDefs(manifest)
 
   // Extract base.imljson by scanning ALL modules' APIs
   const allApis = modules
@@ -163,204 +123,258 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
     result.push(makeFile('base.imljson', baseConfig))
   }
 
-  // Store cleaned module APIs for epoch deduplication
-  const moduleCleanedApis: Record<string, unknown> = {}
-
-  // Generate module files
-  for (const mod of modules) {
-    const prefix = `modules/${mod.name}`
-    const isInstantTrigger = mod.type === 'instant_trigger'
-
-    // metadata.json — all manifest fields except those in separate files
-    const modMeta: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(mod.rawItem)) {
-      if (!MODULE_SEPARATE_FIELDS.has(key)) {
-        modMeta[key] = value
-      }
-    }
-    modMeta.connection = mod.connection
-    modMeta.webhook = mod.webhook
-    modMeta.type = mod.type
-    result.push(makeFile(`${prefix}/metadata.json`, modMeta))
-
-    // expect.imljson — only for actions/searches (not triggers)
-    const params = mod.rawItem.parameters as unknown[] | undefined
-    if (!isInstantTrigger && mod.type !== 'trigger') {
-      // rawItem.expect wins only if a non-empty array; else falls through to __IMTCONN__ nested.store, else []
-      const rawExpect = mod.rawItem.expect
-      const hasRawExpect = Array.isArray(rawExpect) && rawExpect.length > 0
-      let expect: unknown = hasRawExpect ? rawExpect : []
-      if (!hasRawExpect && params && params.length > 0) {
-        const fp = params[0] as Record<string, unknown> | undefined
-        if (fp?.name === '__IMTCONN__') {
-          const options = fp.options as Record<string, unknown> | undefined
-          const nested = options?.nested as Record<string, unknown> | undefined
-          if (nested?.store) {
-            expect = nested.store
-          }
-        }
-      }
-      const expectStr = transformRpcReferences(stringify(expect), appName)
-      result.push({ path: `${prefix}/expect.imljson`, content: expectStr })
-    }
-
-    // interface.imljson — transform RPC references
-    const ifaceStr = transformRpcReferences(stringify(mod.rawItem.interface || []), appName)
-    result.push({ path: `${prefix}/interface.imljson`, content: ifaceStr })
-
-    // scope.imljson — only for actions/searches
-    if (!isInstantTrigger) {
-      result.push(makeFile(`${prefix}/scope.imljson`, mod.rawItem.scope || []))
-    }
-
-    // api.imljson — from app.js, unwrap communication, minus base fields
-    const apiData = cleanApi(moduleApis[mod.name] || {}, baseConfig)
-    moduleCleanedApis[mod.name] = apiData
-    result.push(makeFile(`${prefix}/api.imljson`, apiData))
-
-    // parameters.imljson
-    if (isInstantTrigger) {
-      // For instant triggers, params come from __IMTHOOK__ options.nested
-      let triggerParams: unknown = []
-      if (params && params.length > 0) {
-        const fp = params[0] as Record<string, unknown> | undefined
-        if (fp?.name === '__IMTHOOK__') {
-          const options = fp.options as Record<string, unknown> | undefined
-          const nested = options?.nested
-          if (Array.isArray(nested) && nested.length > 0) {
-            triggerParams = nested
-          }
-        }
-      }
-      result.push(makeFile(`${prefix}/parameters.imljson`, triggerParams))
-    } else if (mod.type === 'trigger') {
-      // For regular triggers, params come from __IMTCONN__ options.nested
-      let triggerParams: unknown = []
-      if (params && params.length > 0) {
-        const fp = params[0] as Record<string, unknown> | undefined
-        if (fp?.name === '__IMTCONN__') {
-          const options = fp.options as Record<string, unknown> | undefined
-          const nested = options?.nested
-          if (Array.isArray(nested) && nested.length > 0) {
-            triggerParams = nested
-          }
-        }
-      }
-      const paramsStr = transformRpcReferences(stringify(triggerParams), appName)
-      result.push({ path: `${prefix}/parameters.imljson`, content: paramsStr })
-    } else {
-      result.push({ path: `${prefix}/parameters.imljson`, content: '[]' })
-    }
-
-    // samples.imljson (always empty)
-    result.push({ path: `${prefix}/samples.imljson`, content: '{}' })
+  const ctx: AppContext = {
+    appName,
+    baseConfig,
+    moduleCleanedApis: {},
+    webhookNames: new Set(modules.flatMap((m) => (m.webhook ? [m.webhook] : [])))
   }
 
-  // Generate endpoint files — manifest.endpoints[] (metadata/parameters/context/scope)
+  for (const mod of modules) {
+    result.push(...buildModuleFiles(mod, moduleApis, ctx))
+  }
+
+  // Generate endpoint files: manifest.endpoints[] (metadata/parameters/context/scope)
   // paired with lib/endpoints.js classes (api), same base.imljson as modules.
-  // Real manifest.endpoints[] entries (google-email@4.19.2) carry no top-level `scope` or
-  // `api` field — accounts is a map keyed by account name (each with its own `scope`
-  // array), and api only exists compiled in lib/endpoints.js. metadata.json's `accounts`
-  // is flattened to just the account names; scope.imljson is the deduped union of every
-  // attached account's scope array (see extractAccountScopes for the multi-account caveat).
   const endpoints = (manifest.endpoints || []) as Record<string, unknown>[]
   for (const endpoint of endpoints) {
-    const name = endpoint.name as string
-    const prefix = `endpoints/${name}`
-
-    const epMeta: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(endpoint)) {
-      if (!ENDPOINT_SEPARATE_FIELDS.has(key)) {
-        epMeta[key] = value
-      }
-    }
-    if (isPlainObj(endpoint.accounts)) {
-      epMeta.accounts = Object.keys(endpoint.accounts)
-    }
-    result.push(
-      makeFile(`${prefix}/metadata.json`, epMeta),
-      makeFile(`${prefix}/inputParameters.imljson`, endpoint.inputParameters || []),
-      makeFile(`${prefix}/outputParameters.imljson`, endpoint.outputParameters || []),
-      makeFile(`${prefix}/scope.imljson`, extractAccountScopes(endpoint.accounts)),
-      { path: `${prefix}/context.md`, content: (endpoint.context as string) || '' }
-    )
-
-    const epApiData = cleanApi(endpointApis[name] || {}, baseConfig)
-    result.push(makeFile(`${prefix}/api.imljson`, epApiData))
+    result.push(...buildEndpointFiles(endpoint, endpointApis, baseConfig))
   }
 
-  // Collect webhook names from instant_trigger modules
-  const webhookNames = new Set(modules.flatMap((m) => (m.webhook ? [m.webhook] : [])))
-
-  // Generate RPC files
   for (const [name, api] of Object.entries(rpcApis)) {
-    // RPC names like "epoch:WatchBoardItemsV2" → modules/WatchBoardItemsV2/epoch.imljson
-    // Hook RPCs like "attach:hookName" → webhooks/hookName/attach.imljson
-    if (name.includes(':')) {
-      const colonIdx = name.indexOf(':')
-      const fileBase = name.substring(0, colonIdx)
-      const targetName = name.substring(colonIdx + 1)
-      const cleaned = cleanApi(api, baseConfig)
+    result.push(...buildRpcFiles(name, api, ctx))
+  }
 
-      // Hook RPCs (attach/detach/update) go to webhooks/ directory
-      const isHookRpc = HOOK_RPC_TYPES.has(fileBase) && webhookNames.has(targetName)
-      if (isHookRpc) {
-        const content = transformRpcReferences(stringify(cleaned), appName)
-        result.push({ path: `webhooks/${targetName}/${fileBase}.imljson`, content })
-        continue
-      }
+  const extras = [
+    ...Object.entries(functions).map(([name, code]) => ({ path: `functions/${name}/code.js`, content: code })),
+    ...files.filter((file) => file.path.startsWith('assets/'))
+  ]
 
-      // Module RPCs (epoch, etc.) — remove fields identical to the module's api.imljson
-      const modApi = moduleCleanedApis[targetName]
-      let epochData = cleaned
-      if (modApi && isPlainObj(modApi) && isPlainObj(cleaned)) {
-        epochData = removeCommonFields(cleaned, modApi)
-      } else if (Array.isArray(modApi) && Array.isArray(cleaned)) {
-        const deduped = cleaned.map((item, i) => {
-          const modItem = modApi[i]
-          if (isPlainObj(item) && isPlainObj(modItem)) {
-            return removeCommonFields(item as Record<string, unknown>, modItem as Record<string, unknown>)
-          }
-          return item
-        })
-        // If all elements are identical, collapse to single object
-        if (deduped.length > 1 && deduped.every((el) => JSON.stringify(el) === JSON.stringify(deduped[0]))) {
-          epochData = deduped[0]
-        } else {
-          epochData = deduped
-        }
-      }
+  return result.concat(extras).sort((a, b) => a.path.localeCompare(b.path))
+}
 
-      const content = transformRpcReferences(stringify(epochData), appName)
-      result.push({ path: `modules/${targetName}/${fileBase}.imljson`, content })
-      continue
+function parseJsFile<T>(
+  files: ExtractedFile[],
+  path: string,
+  parse: (content: string) => Record<string, T>
+): Record<string, T> {
+  const file = files.find((f) => f.path === path)
+  return file ? parse(file.content) : {}
+}
+
+// metadata.json: top-level fields + SDK version
+function buildAppMetadata(manifest: Record<string, unknown>): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {}
+  for (const key of ['name', 'label', 'description', 'theme']) {
+    if (manifest[key] !== undefined) metadata[key] = manifest[key]
+  }
+  metadata.version = 2
+  return metadata
+}
+
+function collectModuleDefs(manifest: Record<string, unknown>): ModuleDef[] {
+  const modules: ModuleDef[] = []
+  for (const [section, moduleType] of [
+    ['actions', 'action'],
+    ['searches', 'search'],
+    ['triggers', 'trigger']
+  ] as const) {
+    for (const item of (manifest[section] || []) as Record<string, unknown>[]) {
+      modules.push(toModuleDef(item, moduleType))
     }
-
-    const prefix = `rpcs/${name}`
-    result.push(
-      makeFile(`${prefix}/metadata.json`, {
-        name,
-        label: camelToLabel(name),
-        connection: null
-      })
-    )
-    const rpcApiData = cleanApi(api, baseConfig)
-    result.push(makeFile(`${prefix}/api.imljson`, rpcApiData), { path: `${prefix}/parameters.imljson`, content: '[]' })
   }
+  return modules
+}
 
-  // Generate function files
-  for (const [name, code] of Object.entries(functions)) {
-    result.push({ path: `functions/${name}/code.js`, content: code })
-  }
+// Extract connection/webhook reference from first parameter
+function toModuleDef(item: Record<string, unknown>, moduleType: string): ModuleDef {
+  let type = moduleType
+  let connection: string | null = null
+  let webhook: string | null = null
 
-  // Copy asset files
-  for (const file of files) {
-    if (file.path.startsWith('assets/')) {
-      result.push(file)
+  const firstParam = ((item.parameters as unknown[] | undefined) || [])[0] as Record<string, unknown> | undefined
+  if (firstParam) {
+    const paramType = (firstParam.type as string) || ''
+    if (firstParam.name === '__IMTCONN__' && paramType.startsWith('account:')) {
+      connection = paramType.replace('account:', '')
+    } else if (firstParam.name === '__IMTHOOK__' && paramType.startsWith('hook:')) {
+      webhook = paramType.replace('hook:', '')
+      type = 'instant_trigger'
     }
   }
 
-  return result.sort((a, b) => a.path.localeCompare(b.path))
+  return { name: item.name as string, type, connection, webhook, rawItem: item }
+}
+
+function buildModuleFiles(mod: ModuleDef, moduleApis: Record<string, unknown>, ctx: AppContext): ExtractedFile[] {
+  const prefix = `modules/${mod.name}`
+  const isInstantTrigger = mod.type === 'instant_trigger'
+  const params = mod.rawItem.parameters as unknown[] | undefined
+
+  const files: ExtractedFile[] = [makeFile(`${prefix}/metadata.json`, buildModuleMetadata(mod))]
+
+  // expect.imljson: only for actions/searches (not triggers)
+  if (!isInstantTrigger && mod.type !== 'trigger') {
+    const expectStr = transformRpcReferences(stringify(resolveExpect(mod.rawItem, params)), ctx.appName)
+    files.push({ path: `${prefix}/expect.imljson`, content: expectStr })
+  }
+
+  // interface.imljson: transform RPC references
+  const ifaceStr = transformRpcReferences(stringify(mod.rawItem.interface || []), ctx.appName)
+  files.push({ path: `${prefix}/interface.imljson`, content: ifaceStr })
+
+  // scope.imljson: only for actions/searches
+  if (!isInstantTrigger) {
+    files.push(makeFile(`${prefix}/scope.imljson`, mod.rawItem.scope || []))
+  }
+
+  // api.imljson: from app.js, unwrap communication, minus base fields
+  const apiData = cleanApi(moduleApis[mod.name] || {}, ctx.baseConfig)
+  ctx.moduleCleanedApis[mod.name] = apiData
+
+  files.push(
+    makeFile(`${prefix}/api.imljson`, apiData),
+    moduleParametersFile(`${prefix}/parameters.imljson`, mod.type, params, ctx.appName),
+    { path: `${prefix}/samples.imljson`, content: '{}' }
+  )
+  return files
+}
+
+// metadata.json: all manifest fields except those in separate files
+function buildModuleMetadata(mod: ModuleDef): Record<string, unknown> {
+  const modMeta: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(mod.rawItem)) {
+    if (!MODULE_SEPARATE_FIELDS.has(key)) {
+      modMeta[key] = value
+    }
+  }
+  modMeta.connection = mod.connection
+  modMeta.webhook = mod.webhook
+  modMeta.type = mod.type
+  return modMeta
+}
+
+// rawItem.expect wins only if a non-empty array; else falls through to __IMTCONN__ nested.store, else []
+function resolveExpect(rawItem: Record<string, unknown>, params: unknown[] | undefined): unknown {
+  const rawExpect = rawItem.expect
+  if (Array.isArray(rawExpect) && rawExpect.length > 0) return rawExpect
+  const nested = firstParamNested(params, '__IMTCONN__') as Record<string, unknown> | undefined
+  return nested?.store || []
+}
+
+function firstParamNested(params: unknown[] | undefined, paramName: string): unknown {
+  const fp = params && params.length > 0 ? (params[0] as Record<string, unknown> | undefined) : undefined
+  if (fp?.name !== paramName) return undefined
+  const options = fp.options as Record<string, unknown> | undefined
+  return options?.nested
+}
+
+function nonEmptyArrayOrEmpty(value: unknown): unknown {
+  return Array.isArray(value) && value.length > 0 ? value : []
+}
+
+// Instant triggers read __IMTHOOK__ options.nested and are not rpc:// transformed; regular triggers read
+// __IMTCONN__ options.nested and are transformed; actions and searches always get []
+function moduleParametersFile(
+  path: string,
+  type: string,
+  params: unknown[] | undefined,
+  appName: string
+): ExtractedFile {
+  if (type === 'instant_trigger') {
+    return makeFile(path, nonEmptyArrayOrEmpty(firstParamNested(params, '__IMTHOOK__')))
+  }
+  if (type === 'trigger') {
+    const triggerParams = nonEmptyArrayOrEmpty(firstParamNested(params, '__IMTCONN__'))
+    return { path, content: transformRpcReferences(stringify(triggerParams), appName) }
+  }
+  return { path, content: '[]' }
+}
+
+// Real manifest.endpoints[] entries (google-email@4.19.2) carry no top-level `scope` or
+// `api` field: accounts is a map keyed by account name (each with its own `scope`
+// array), and api only exists compiled in lib/endpoints.js. metadata.json's `accounts`
+// is flattened to just the account names; scope.imljson is the deduped union of every
+// attached account's scope array (see extractAccountScopes for the multi-account caveat).
+function buildEndpointFiles(
+  endpoint: Record<string, unknown>,
+  endpointApis: Record<string, unknown>,
+  baseConfig: Record<string, unknown>
+): ExtractedFile[] {
+  const name = endpoint.name as string
+  const prefix = `endpoints/${name}`
+
+  const epMeta: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(endpoint)) {
+    if (!ENDPOINT_SEPARATE_FIELDS.has(key)) {
+      epMeta[key] = value
+    }
+  }
+  if (isPlainObj(endpoint.accounts)) {
+    epMeta.accounts = Object.keys(endpoint.accounts)
+  }
+
+  return [
+    makeFile(`${prefix}/metadata.json`, epMeta),
+    makeFile(`${prefix}/inputParameters.imljson`, endpoint.inputParameters || []),
+    makeFile(`${prefix}/outputParameters.imljson`, endpoint.outputParameters || []),
+    makeFile(`${prefix}/scope.imljson`, extractAccountScopes(endpoint.accounts)),
+    { path: `${prefix}/context.md`, content: (endpoint.context as string) || '' },
+    makeFile(`${prefix}/api.imljson`, cleanApi(endpointApis[name] || {}, baseConfig))
+  ]
+}
+
+// RPC names like "epoch:WatchBoardItemsV2" → modules/WatchBoardItemsV2/epoch.imljson
+// Hook RPCs like "attach:hookName" → webhooks/hookName/attach.imljson
+function buildRpcFiles(name: string, api: unknown, ctx: AppContext): ExtractedFile[] {
+  if (name.includes(':')) return [buildScopedRpcFile(name, api, ctx)]
+
+  const prefix = `rpcs/${name}`
+  return [
+    makeFile(`${prefix}/metadata.json`, {
+      name,
+      label: camelToLabel(name),
+      connection: null
+    }),
+    makeFile(`${prefix}/api.imljson`, cleanApi(api, ctx.baseConfig)),
+    { path: `${prefix}/parameters.imljson`, content: '[]' }
+  ]
+}
+
+function buildScopedRpcFile(name: string, api: unknown, ctx: AppContext): ExtractedFile {
+  const colonIdx = name.indexOf(':')
+  const fileBase = name.substring(0, colonIdx)
+  const targetName = name.substring(colonIdx + 1)
+  const cleaned = cleanApi(api, ctx.baseConfig)
+
+  // Hook RPCs (attach/detach/update) go to webhooks/ directory
+  if (HOOK_RPC_TYPES.has(fileBase) && ctx.webhookNames.has(targetName)) {
+    const content = transformRpcReferences(stringify(cleaned), ctx.appName)
+    return { path: `webhooks/${targetName}/${fileBase}.imljson`, content }
+  }
+
+  // Module RPCs (epoch, etc.): remove fields identical to the module's api.imljson
+  const epochData = dedupeEpoch(cleaned, ctx.moduleCleanedApis[targetName])
+  const content = transformRpcReferences(stringify(epochData), ctx.appName)
+  return { path: `modules/${targetName}/${fileBase}.imljson`, content }
+}
+
+function dedupeEpoch(cleaned: unknown, modApi: unknown): unknown {
+  if (isPlainObj(modApi) && isPlainObj(cleaned)) return removeCommonFields(cleaned, modApi)
+  if (Array.isArray(modApi) && Array.isArray(cleaned)) return dedupeEpochArray(cleaned, modApi)
+  return cleaned
+}
+
+// Per-index dedupe; if all elements end up identical, collapse to a single object
+function dedupeEpochArray(cleaned: unknown[], modApi: unknown[]): unknown {
+  const deduped = cleaned.map((item, i) => {
+    const modItem = modApi[i]
+    return isPlainObj(item) && isPlainObj(modItem) ? removeCommonFields(item, modItem) : item
+  })
+  if (deduped.length > 1 && deduped.every((el) => JSON.stringify(el) === JSON.stringify(deduped[0]))) {
+    return deduped[0]
+  }
+  return deduped
 }
 
 // ---- Account → Connection ----
@@ -522,28 +536,7 @@ export function extractBaseFromAll(apis: Record<string, unknown>[]): Record<stri
   const base: Record<string, unknown> = {}
 
   for (const field of BASE_TOP_FIELDS) {
-    // Collect all values per module (a module may have multiple comm steps)
-    const moduleValues: string[][] = []
-
-    for (const api of apis) {
-      const vals: string[] = []
-      if (api[field] !== undefined) {
-        vals.push(JSON.stringify(api[field]))
-      } else {
-        // Check inside ALL communication steps (not just [0])
-        const comm = api.communication as Record<string, unknown>[] | undefined
-        if (Array.isArray(comm)) {
-          for (const step of comm) {
-            if (step[field] !== undefined) {
-              vals.push(JSON.stringify(step[field]))
-            }
-          }
-        }
-      }
-      if (vals.length > 0) moduleValues.push(vals)
-    }
-
-    const bestVal = pluralityWinner(moduleValues, apis.length, SCALAR_MIN_VALUE_SHARE)
+    const bestVal = scalarPlurality(apis, (api) => collectScalarValues(api, field))
     if (bestVal !== undefined) {
       base[field] = JSON.parse(bestVal)
     }
@@ -561,41 +554,14 @@ export function extractBaseFromAll(apis: Record<string, unknown>[]): Record<stri
   // response.error is always object-shaped (status code -> {type, message}); dedupe its
   // sub-keys the same way as headers/qs, not as one atomic blob — a per-step override of
   // a single status code shouldn't drag the other, genuinely shared, codes along with it.
-  const baseError = extractCommonObjectField(apis, (api) =>
-    getAllResponseObjs(api)
-      .map((r) => r.error)
-      .filter(isPlainObj)
-  )
+  const baseError = extractCommonObjectField(apis, (api) => responseFieldObjects(api, 'error'))
   if (Object.keys(baseError).length > 0) {
-    if (!base.response) base.response = {}
-    ;(base.response as Record<string, unknown>).error = baseError
+    setResponseField(base, 'error', baseError)
   }
 
-  // response.valid is usually a scalar (boolean/template string) but is object-shaped for
-  // some modules (e.g. { condition }); try the composite per-key path first, and only fall
-  // back to a scalar plurality match if no object-shaped consensus was found.
-  const baseValidObj = extractCommonObjectField(apis, (api) =>
-    getAllResponseObjs(api)
-      .map((r) => r.valid)
-      .filter(isPlainObj)
-  )
-  if (Object.keys(baseValidObj).length > 0) {
-    if (!base.response) base.response = {}
-    ;(base.response as Record<string, unknown>).valid = baseValidObj
-  } else {
-    const moduleValues: string[][] = []
-    for (const api of apis) {
-      const vals: string[] = []
-      for (const response of getAllResponseObjs(api)) {
-        if (response.valid !== undefined) vals.push(JSON.stringify(response.valid))
-      }
-      if (vals.length > 0) moduleValues.push(vals)
-    }
-    const bestVal = pluralityWinner(moduleValues, apis.length, SCALAR_MIN_VALUE_SHARE)
-    if (bestVal !== undefined) {
-      if (!base.response) base.response = {}
-      ;(base.response as Record<string, unknown>).valid = JSON.parse(bestVal)
-    }
+  const baseValid = extractBaseResponseValid(apis)
+  if (baseValid !== undefined) {
+    setResponseField(base, 'valid', baseValid)
   }
 
   // Extract common temp sub-fields across all modules
@@ -607,11 +573,60 @@ export function extractBaseFromAll(apis: Record<string, unknown>[]): Record<stri
   // Extract common response.temp sub-fields across all modules
   const baseResponseTemp = extractCommonResponseTemp(apis)
   if (Object.keys(baseResponseTemp).length > 0) {
-    if (!base.response) base.response = {}
-    ;(base.response as Record<string, unknown>).temp = baseResponseTemp
+    setResponseField(base, 'temp', baseResponseTemp)
   }
 
   return base
+}
+
+/**
+ * Serialized values of `field` for one module: the flat api value if present, otherwise the
+ * value of every communication step that has it (not just [0]).
+ */
+function collectScalarValues(api: Record<string, unknown>, field: string): string[] {
+  if (api[field] !== undefined) return [JSON.stringify(api[field])]
+  const comm = api.communication as Record<string, unknown>[] | undefined
+  if (!Array.isArray(comm)) return []
+  return serializedValues(comm, field)
+}
+
+function serializedValues(objs: Record<string, unknown>[], key: string): string[] {
+  return objs.filter((o) => o[key] !== undefined).map((o) => JSON.stringify(o[key]))
+}
+
+/** Plurality vote over the per-module serialized values; modules without a value do not vote. */
+function scalarPlurality(
+  apis: Record<string, unknown>[],
+  collect: (api: Record<string, unknown>) => string[]
+): string | undefined {
+  const moduleValues = apis.map((api) => collect(api)).filter((vals) => vals.length > 0)
+  return pluralityWinner(moduleValues, apis.length, SCALAR_MIN_VALUE_SHARE)
+}
+
+function responseFieldObjects(api: Record<string, unknown>, key: string): Record<string, unknown>[] {
+  return getAllResponseObjs(api)
+    .map((r) => r[key])
+    .filter(isPlainObj)
+}
+
+/**
+ * response.valid is usually a scalar (boolean/template string) but is object-shaped for
+ * some modules (e.g. { condition }); try the composite per-key path first, and only fall
+ * back to a scalar plurality match if no object-shaped consensus was found.
+ */
+function extractBaseResponseValid(apis: Record<string, unknown>[]): unknown {
+  const baseValidObj = extractCommonObjectField(apis, (api) => responseFieldObjects(api, 'valid'))
+  if (Object.keys(baseValidObj).length > 0) return baseValidObj
+  const bestVal = scalarPlurality(apis, (api) => serializedValues(getAllResponseObjs(api), 'valid'))
+  return bestVal === undefined ? undefined : JSON.parse(bestVal)
+}
+
+function setResponseField(base: Record<string, unknown>, key: string, value: unknown): void {
+  if (!base.response) {
+    base.response = {}
+  }
+  const response = base.response as Record<string, unknown>
+  response[key] = value
 }
 
 /**
@@ -637,29 +652,36 @@ function getAllResponseObjs(api: Record<string, unknown>): Record<string, unknow
  * Scans ALL communication steps (not just [0]). Checks all keys across all temps.
  */
 function extractCommonResponseTemp(apis: Record<string, unknown>[]): Record<string, unknown> {
-  const temps: Record<string, unknown>[] = []
-  for (const api of apis) {
-    const responses = getAllResponseObjs(api)
-    for (const response of responses) {
-      const temp = response.temp as Record<string, unknown> | undefined
-      if (temp && typeof temp === 'object') {
-        temps.push(temp)
-      }
-    }
-  }
+  const temps = apis
+    .flatMap((api) => getAllResponseObjs(api))
+    .map((r) => r.temp)
+    .filter(isObjectLike)
+  return commonIdenticalKeys(temps)
+}
 
+/**
+ * Find temp sub-fields that are common (identical value) across ALL modules that have temp.
+ * Scans ALL communication steps. Checks all keys across all temps.
+ */
+function extractCommonTemp(apis: Record<string, unknown>[]): Record<string, unknown> {
+  return commonIdenticalKeys(apis.flatMap((api) => collectTemps(api)))
+}
+
+/** The flat `temp` of an api if it is object-like, otherwise the object-like `temp` of every step. */
+function collectTemps(api: Record<string, unknown>): Record<string, unknown>[] {
+  const temp = api.temp
+  if (isObjectLike(temp)) return [temp]
+  const comm = api.communication as Record<string, unknown>[] | undefined
+  if (!Array.isArray(comm)) return []
+  return comm.map((step) => step.temp).filter(isObjectLike)
+}
+
+/** Keys (over the union of all temps) whose value is present and identical in every temp; needs 2+ temps. */
+function commonIdenticalKeys(temps: Record<string, unknown>[]): Record<string, unknown> {
   if (temps.length < 2) return {}
 
-  // Collect ALL keys from all temps (not just the first)
-  const allKeys = new Set<string>()
-  for (const temp of temps) {
-    for (const key of Object.keys(temp)) {
-      allKeys.add(key)
-    }
-  }
-
   const common: Record<string, unknown> = {}
-  for (const key of allKeys) {
+  for (const key of unionKeys(temps)) {
     const firstVal = temps.find((t) => t[key] !== undefined)
     if (!firstVal) continue
     const serialized = JSON.stringify(firstVal[key])
@@ -672,51 +694,12 @@ function extractCommonResponseTemp(apis: Record<string, unknown>[]): Record<stri
   return common
 }
 
-/**
- * Find temp sub-fields that are common (identical value) across ALL modules that have temp.
- * Scans ALL communication steps. Checks all keys across all temps.
- */
-function extractCommonTemp(apis: Record<string, unknown>[]): Record<string, unknown> {
-  const temps: Record<string, unknown>[] = []
-  for (const api of apis) {
-    const temp = api.temp as Record<string, unknown> | undefined
-    if (temp && typeof temp === 'object') {
-      temps.push(temp)
-      continue
-    }
-    const comm = api.communication as Record<string, unknown>[] | undefined
-    if (Array.isArray(comm)) {
-      for (const step of comm) {
-        const commTemp = step.temp as Record<string, unknown> | undefined
-        if (commTemp && typeof commTemp === 'object') {
-          temps.push(commTemp)
-        }
-      }
-    }
+function unionKeys(objs: Record<string, unknown>[]): Set<string> {
+  const keys = new Set<string>()
+  for (const obj of objs) {
+    for (const key of Object.keys(obj)) keys.add(key)
   }
-
-  if (temps.length < 2) return {}
-
-  // Collect ALL keys from all temps (not just the first)
-  const allKeys = new Set<string>()
-  for (const temp of temps) {
-    for (const key of Object.keys(temp)) {
-      allKeys.add(key)
-    }
-  }
-
-  const common: Record<string, unknown> = {}
-  for (const key of allKeys) {
-    const firstVal = temps.find((t) => t[key] !== undefined)
-    if (!firstVal) continue
-    const serialized = JSON.stringify(firstVal[key])
-    const isCommon = temps.every((t) => t[key] !== undefined && JSON.stringify(t[key]) === serialized)
-    if (isCommon) {
-      common[key] = firstVal[key]
-    }
-  }
-
-  return common
+  return keys
 }
 
 /**
@@ -759,28 +742,13 @@ function extractCommonObjectField(
   apis: Record<string, unknown>[],
   collect: (api: Record<string, unknown>) => Record<string, unknown>[]
 ): Record<string, unknown> {
-  const moduleObjs: Record<string, unknown>[][] = []
-  for (const api of apis) {
-    const objs = collect(api)
-    if (objs.length > 0) moduleObjs.push(objs)
-  }
+  const moduleObjs = apis.map((api) => collect(api)).filter((objs) => objs.length > 0)
 
   if (moduleObjs.length === 0) return {}
 
-  const allKeys = new Set<string>()
-  for (const objs of moduleObjs) {
-    for (const obj of objs) {
-      for (const key of Object.keys(obj)) allKeys.add(key)
-    }
-  }
-
   const common: Record<string, unknown> = {}
-  for (const key of allKeys) {
-    const perModuleValues: string[][] = []
-    for (const objs of moduleObjs) {
-      const vals = objs.filter((o) => o[key] !== undefined).map((o) => JSON.stringify(o[key]))
-      if (vals.length > 0) perModuleValues.push(vals)
-    }
+  for (const key of unionKeys(moduleObjs.flat())) {
+    const perModuleValues = moduleObjs.map((objs) => serializedValues(objs, key)).filter((vals) => vals.length > 0)
 
     const bestVal = pluralityWinner(perModuleValues, apis.length, COMPOSITE_MIN_VALUE_SHARE)
     if (bestVal !== undefined) {
@@ -847,127 +815,138 @@ export function cleanApi(raw: unknown, baseConfig: Record<string, unknown>): unk
  */
 function diffAgainstBaseObject(value: unknown, baseObj: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!isPlainObj(value)) return undefined
+  return diffKeys(value, baseObj)
+}
+
+function diffKeys(value: Record<string, unknown>, base: Record<string, unknown>): Record<string, unknown> {
   const diffed: Record<string, unknown> = {}
   for (const [key, v] of Object.entries(value)) {
-    if (!(key in baseObj) || JSON.stringify(v) !== JSON.stringify(baseObj[key])) {
+    if (!(key in base) || JSON.stringify(v) !== JSON.stringify(base[key])) {
       diffed[key] = v
     }
   }
   return diffed
 }
 
+function assignOrDelete(target: Record<string, unknown>, key: string, value: Record<string, unknown>): void {
+  if (Object.keys(value).length > 0) {
+    target[key] = value
+  } else {
+    delete target[key]
+  }
+}
+
 function removeBaseFields(api: Record<string, unknown>, baseConfig: Record<string, unknown>): Record<string, unknown> {
   const result = { ...api }
 
-  // Only remove top-level base fields if their value matches the base value
-  for (const field of BASE_TOP_FIELDS) {
-    if (baseConfig[field] !== undefined && result[field] !== undefined) {
-      if (JSON.stringify(result[field]) === JSON.stringify(baseConfig[field])) {
-        delete result[field]
-      }
-      // If values differ, keep the module-specific value
-    }
-  }
-
-  // Remove common composite-field sub-keys (whichever fields extraction found), keep module-specific ones
-  for (const field of Object.keys(baseConfig)) {
-    if (BASE_TOP_FIELDS.includes(field) || DEDICATED_FIELDS.has(field)) continue
-    const baseFieldObj = baseConfig[field] as Record<string, unknown>
-    const diffed = diffAgainstBaseObject(result[field], baseFieldObj)
-    if (diffed !== undefined) {
-      if (Object.keys(diffed).length > 0) {
-        result[field] = diffed
-      } else {
-        delete result[field]
-      }
-    }
-  }
+  stripMatchingScalars(result, baseConfig)
+  stripCompositeBaseKeys(result, baseConfig)
 
   // Handle response: remove base response fields and common response.temp sub-fields
   const response = result.response as Record<string, unknown> | undefined
   const baseResponse = baseConfig.response as Record<string, unknown> | undefined
   if (response && baseResponse) {
-    const moduleResponse: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(response)) {
-      if (key === 'temp') {
-        // Remove common response.temp sub-fields, keep module-specific ones
-        const baseResponseTemp = baseResponse.temp as Record<string, unknown> | undefined
-        if (baseResponseTemp && typeof value === 'object' && value !== null) {
-          const moduleTemp: Record<string, unknown> = {}
-          for (const [tKey, tValue] of Object.entries(value as Record<string, unknown>)) {
-            if (!(tKey in baseResponseTemp) || JSON.stringify(tValue) !== JSON.stringify(baseResponseTemp[tKey])) {
-              moduleTemp[tKey] = tValue
-            }
-          }
-          if (Object.keys(moduleTemp).length > 0) {
-            moduleResponse.temp = moduleTemp
-          }
-        } else {
-          moduleResponse[key] = value
-        }
-      } else if (key === 'error') {
-        // response.error is object-shaped (status code -> {type, message}); drop only the
-        // sub-keys that match base, keeping this module's own overridden status codes
-        const baseError = baseResponse.error as Record<string, unknown> | undefined
-        if (baseError) {
-          const diffed = diffAgainstBaseObject(value, baseError)
-          if (diffed === undefined) {
-            moduleResponse.error = value
-          } else if (Object.keys(diffed).length > 0) {
-            moduleResponse.error = diffed
-          }
-        } else {
-          moduleResponse.error = value
-        }
-      } else if (key === 'valid') {
-        // response.valid is usually a scalar but can be object-shaped for some modules;
-        // diff per-key when base is object-shaped, otherwise fall back to a scalar match
-        const baseValid = baseResponse.valid
-        if (baseValid !== undefined) {
-          if (isPlainObj(baseValid)) {
-            const diffed = diffAgainstBaseObject(value, baseValid)
-            if (diffed === undefined) {
-              moduleResponse.valid = value
-            } else if (Object.keys(diffed).length > 0) {
-              moduleResponse.valid = diffed
-            }
-          } else if (JSON.stringify(value) !== JSON.stringify(baseValid)) {
-            moduleResponse.valid = value
-          }
-        } else {
-          moduleResponse.valid = value
-        }
-      } else {
-        moduleResponse[key] = value
-      }
-    }
-    if (Object.keys(moduleResponse).length > 0) {
-      result.response = moduleResponse
-    } else {
-      delete result.response
-    }
+    assignOrDelete(result, 'response', diffResponse(response, baseResponse))
   }
 
   // Remove common temp sub-fields, keep module-specific ones
   const baseTemp = baseConfig.temp as Record<string, unknown> | undefined
-  if (baseTemp) {
-    const temp = result.temp as Record<string, unknown> | undefined
-    if (temp && typeof temp === 'object') {
-      const moduleTemp: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(temp)) {
-        if (!(key in baseTemp) || JSON.stringify(value) !== JSON.stringify(baseTemp[key])) {
-          moduleTemp[key] = value
-        }
-      }
-      if (Object.keys(moduleTemp).length > 0) {
-        result.temp = moduleTemp
-      } else {
-        delete result.temp
-      }
-    }
+  const temp = result.temp
+  if (baseTemp && isObjectLike(temp)) {
+    assignOrDelete(result, 'temp', diffKeys(temp, baseTemp))
   }
 
   return result
+}
+
+// Only remove top-level base fields if their value matches the base value; a differing value is a module override
+function stripMatchingScalars(result: Record<string, unknown>, baseConfig: Record<string, unknown>): void {
+  for (const field of BASE_TOP_FIELDS) {
+    if (
+      baseConfig[field] !== undefined &&
+      result[field] !== undefined &&
+      JSON.stringify(result[field]) === JSON.stringify(baseConfig[field])
+    ) {
+      delete result[field]
+    }
+  }
+}
+
+// Remove common composite-field sub-keys (whichever fields extraction found), keep module-specific ones
+function stripCompositeBaseKeys(result: Record<string, unknown>, baseConfig: Record<string, unknown>): void {
+  for (const field of Object.keys(baseConfig)) {
+    if (BASE_TOP_FIELDS.has(field) || DEDICATED_FIELDS.has(field)) continue
+    const baseFieldObj = baseConfig[field] as Record<string, unknown>
+    const diffed = diffAgainstBaseObject(result[field], baseFieldObj)
+    if (diffed !== undefined) {
+      assignOrDelete(result, field, diffed)
+    }
+  }
+}
+
+function diffResponse(
+  response: Record<string, unknown>,
+  baseResponse: Record<string, unknown>
+): Record<string, unknown> {
+  const moduleResponse: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(response)) {
+    if (key === 'temp') {
+      applyResponseTemp(moduleResponse, value, baseResponse.temp as Record<string, unknown> | undefined)
+    } else if (key === 'error') {
+      // response.error is object-shaped (status code -> {type, message}); drop only the
+      // sub-keys that match base, keeping this module's own overridden status codes
+      applyObjectDiff(moduleResponse, 'error', value, baseResponse.error as Record<string, unknown> | undefined)
+    } else if (key === 'valid') {
+      applyResponseValid(moduleResponse, value, baseResponse.valid)
+    } else {
+      moduleResponse[key] = value
+    }
+  }
+  return moduleResponse
+}
+
+// Remove common response.temp sub-fields, keep module-specific ones
+function applyResponseTemp(
+  out: Record<string, unknown>,
+  value: unknown,
+  baseTemp: Record<string, unknown> | undefined
+): void {
+  if (!baseTemp || !isObjectLike(value)) {
+    out.temp = value
+    return
+  }
+  const moduleTemp = diffKeys(value, baseTemp)
+  if (Object.keys(moduleTemp).length > 0) {
+    out.temp = moduleTemp
+  }
+}
+
+/**
+ * Keeps `value` as-is when there is no base object or `value` is not a plain object, keeps
+ * only the differing sub-keys otherwise, and drops the key when nothing differs.
+ */
+function applyObjectDiff(
+  out: Record<string, unknown>,
+  key: string,
+  value: unknown,
+  baseObj: Record<string, unknown> | undefined
+): void {
+  const diffed = baseObj ? diffAgainstBaseObject(value, baseObj) : undefined
+  if (diffed === undefined) {
+    out[key] = value
+  } else if (Object.keys(diffed).length > 0) {
+    out[key] = diffed
+  }
+}
+
+// response.valid is usually a scalar but can be object-shaped for some modules;
+// diff per-key when base is object-shaped, otherwise fall back to a scalar match
+function applyResponseValid(out: Record<string, unknown>, value: unknown, baseValid: unknown): void {
+  if (isPlainObj(baseValid)) {
+    applyObjectDiff(out, 'valid', value, baseValid)
+  } else if (baseValid === undefined || JSON.stringify(value) !== JSON.stringify(baseValid)) {
+    out.valid = value
+  }
 }
 
 // ---- RPC reference transformation ----
@@ -998,6 +977,11 @@ function camelToLabel(name: string): string {
 
 function isPlainObj(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null && !Array.isArray(val)
+}
+
+// Unlike isPlainObj this accepts arrays: the temp handling always treated an array temp as an object
+function isObjectLike(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null
 }
 
 /**

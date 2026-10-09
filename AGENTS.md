@@ -115,20 +115,20 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 | Compiled | SDK |
 |----------|-----|
 | `manifest.json` top fields | `metadata.json` |
-| `lib/app.js` classes (vm) | `modules/{name}/api.imljson` |
-| `lib/rpc.js` classes (vm) | `rpcs/{name}/api.imljson` |
+| `lib/app.js` classes (static parse) | `modules/{name}/api.imljson` |
+| `lib/rpc.js` classes (static parse) | `rpcs/{name}/api.imljson` |
 | `lib/functions.js` exports | `functions/{name}/code.js` |
 | Common fields across modules | `base.imljson` |
 | `accounts/` (compiled) | `connections/` (SDK) |
 | `hooks/` (compiled) | `webhooks/` (SDK) |
 
 **Key behaviors:**
-- JS parsed via Node.js `vm` module with mocked Make.com runtime classes
+- JS is read as an AST with acorn (`decompiler-sandbox.ts`) and never executed; a construct that is not a plain literal makes the decompiler fall back to the raw compiled files
 - `iml` field stripped from all extracted API objects
 - `metadata` field stripped from module/RPC APIs (but kept in connections)
 - `communication` arrays unwrapped: `{communication: [...]}` → `[...]`
 - Base fields (`baseUrl`, `headers`, `timeout`, `log`, `response.error`, common `temp`, common `response.temp`) extracted to `base.imljson` and removed from each module/RPC
-- Base extraction uses frequency-based approach: scans ALL communication steps (not just `[0]`) across ALL modules, picks the most common value that appears in 2+ modules
+- Base extraction scans ALL communication steps (not just `[0]`) of ALL modules and promotes a field only if every module has it and its most common value holds a large enough share of the modules: 30% for scalar fields (`baseUrl`, `timeout`, `body`, scalar `response.valid`), 90% for the sub-keys of object fields (headers, qs, `response.error`)
 - Module-specific overrides preserved: if a module's field value differs from base, it stays in the module
 - Common `temp` / `response.temp` sub-fields: only sub-fields with identical values across ALL modules go to base; module-specific sub-fields stay in each module
 - RPC references transformed: `rpc://{appName}@{N}/` → `rpc://`
