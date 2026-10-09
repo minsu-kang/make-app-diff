@@ -17,7 +17,7 @@ export class IpmClient {
 
   constructor(
     private settings: IpmSettings,
-    private baseUrl?: string
+    private readonly baseUrl?: string
   ) {
     this.client = this.createClient(settings)
   }

@@ -499,7 +499,7 @@ describe('decompileApp', () => {
     const api = parseFile(result, 'modules/act/api.imljson')
     // Should be unwrapped to array directly
     expect(Array.isArray(api)).toBe(true)
-    expect((api as Record<string, unknown>[]).length).toBe(2)
+    expect(api as Record<string, unknown>[]).toHaveLength(2)
     expect((api as Record<string, unknown>[])[0].url).toBe('/step1')
   })
 

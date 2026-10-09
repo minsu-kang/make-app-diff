@@ -277,12 +277,13 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
     if (isPlainObj(endpoint.accounts)) {
       epMeta.accounts = Object.keys(endpoint.accounts)
     }
-    result.push(makeFile(`${prefix}/metadata.json`, epMeta))
-
-    result.push(makeFile(`${prefix}/inputParameters.imljson`, endpoint.inputParameters || []))
-    result.push(makeFile(`${prefix}/outputParameters.imljson`, endpoint.outputParameters || []))
-    result.push(makeFile(`${prefix}/scope.imljson`, extractAccountScopes(endpoint.accounts)))
-    result.push({ path: `${prefix}/context.md`, content: (endpoint.context as string) || '' })
+    result.push(
+      makeFile(`${prefix}/metadata.json`, epMeta),
+      makeFile(`${prefix}/inputParameters.imljson`, endpoint.inputParameters || []),
+      makeFile(`${prefix}/outputParameters.imljson`, endpoint.outputParameters || []),
+      makeFile(`${prefix}/scope.imljson`, extractAccountScopes(endpoint.accounts)),
+      { path: `${prefix}/context.md`, content: (endpoint.context as string) || '' }
+    )
 
     const epApiData = cleanApi(endpointApis[name] || {}, baseConfig)
     result.push(makeFile(`${prefix}/api.imljson`, epApiData))
@@ -344,8 +345,7 @@ function doDecompileApp(files: ExtractedFile[], appName: string): ExtractedFile[
       })
     )
     const rpcApiData = cleanApi(api, baseConfig)
-    result.push(makeFile(`${prefix}/api.imljson`, rpcApiData))
-    result.push({ path: `${prefix}/parameters.imljson`, content: '[]' })
+    result.push(makeFile(`${prefix}/api.imljson`, rpcApiData), { path: `${prefix}/parameters.imljson`, content: '[]' })
   }
 
   // Generate function files
@@ -377,16 +377,12 @@ function doDecompileAccount(files: ExtractedFile[]): ExtractedFile[] {
   for (const key of ['name', 'label', 'type']) {
     if (manifest[key] !== undefined) metadata[key] = manifest[key]
   }
-  result.push(makeFile('metadata.json', metadata))
-
-  // parameters.imljson
-  result.push(makeFile('parameters.imljson', manifest.parameters || []))
-
-  // scope.imljson
-  result.push(makeFile('scope.imljson', manifest.scope || []))
-
-  // scopes.imljson
-  result.push(makeFile('scopes.imljson', manifest.scopes || {}))
+  result.push(
+    makeFile('metadata.json', metadata),
+    makeFile('parameters.imljson', manifest.parameters || []),
+    makeFile('scope.imljson', manifest.scope || []),
+    makeFile('scopes.imljson', manifest.scopes || {})
+  )
 
   // api.imljson from account.js
   const accountJs = files.find((f) => f.path === 'lib/account.js')
@@ -463,9 +459,7 @@ function doDecompileHook(files: ExtractedFile[]): ExtractedFile[] {
 
   // attach.imljson, detach.imljson, update.imljson — default empty
   // (app's rpc.js may override these via doDecompileApp into webhooks/{hookName}/)
-  result.push(makeFile('attach.imljson', {}))
-  result.push(makeFile('detach.imljson', {}))
-  result.push(makeFile('update.imljson', {}))
+  result.push(makeFile('attach.imljson', {}), makeFile('detach.imljson', {}), makeFile('update.imljson', {}))
 
   return result
 }
@@ -979,8 +973,8 @@ function removeBaseFields(api: Record<string, unknown>, baseConfig: Record<strin
 // ---- RPC reference transformation ----
 
 function transformRpcReferences(content: string, appName: string): string {
-  const escaped = appName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const pattern = new RegExp(`rpc://${escaped}@\\d+/`, 'g')
+  const escaped = appName.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+  const pattern = new RegExp(String.raw`rpc://${escaped}@\d+/`, 'g')
   return content.replace(pattern, 'rpc://')
 }
 

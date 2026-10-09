@@ -16,7 +16,7 @@ function getBinaryMime(filePath: string): string | null {
   return BINARY_MIME[ext] || null
 }
 
-const IMAGE_DATA_URI = /^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/=]*)$/i
+const IMAGE_DATA_URI = /^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/=]*)$/i
 
 /** Content to write to disk or a ZIP: image data URIs from extractPkr become bytes, everything else stays text */
 export function toFileData(filePath: string, content: string): Buffer | string {

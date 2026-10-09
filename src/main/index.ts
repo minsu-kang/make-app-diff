@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
-import { join } from 'path'
+import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
 import { resolveIpmBaseUrl } from './services/ipm-base-url'

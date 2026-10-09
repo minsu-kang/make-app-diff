@@ -1,9 +1,9 @@
 import { ipcMain, dialog, shell, clipboard } from 'electron'
-import * as fs from 'fs/promises'
-import { createWriteStream } from 'fs'
-import * as path from 'path'
-import { tmpdir } from 'os'
-import { execFile } from 'child_process'
+import * as fs from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import * as path from 'node:path'
+import { tmpdir } from 'node:os'
+import { execFile } from 'node:child_process'
 import archiver from 'archiver'
 import { enableMenuItems, disableMenuItems } from './index'
 import { IpmClient } from './services/ipm-client'
@@ -46,7 +46,7 @@ function compareSemverDesc(a: string, b: string): number {
 
 function assertNumber(value: unknown, name: string): asserts value is number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error(`Invalid ${name}: expected finite number`)
+    throw new TypeError(`Invalid ${name}: expected finite number`)
   }
 }
 
@@ -334,10 +334,7 @@ export function registerIpcHandlers(options: { ipmBaseUrl?: string } = {}): void
     async (_event, appName: string, fromVersion: string, toVersion: string, decompile: boolean = true) => {
       try {
         const cached =
-          diffCache &&
-          diffCache.appName === appName &&
-          diffCache.fromVersion === fromVersion &&
-          diffCache.toVersion === toVersion
+          diffCache?.appName === appName && diffCache.fromVersion === fromVersion && diffCache.toVersion === toVersion
             ? diffCache
             : null
 
@@ -462,7 +459,7 @@ export function registerIpcHandlers(options: { ipmBaseUrl?: string } = {}): void
 
   ipcMain.handle('ipm:show-version', async (_event, appName: string, version: string, decompile: boolean = true) => {
     try {
-      const cached = showCache && showCache.appName === appName && showCache.version === version ? showCache : null
+      const cached = showCache?.appName === appName && showCache.version === version ? showCache : null
 
       let rawFiles: ExtractedFile[]
       let isCustom: boolean
@@ -543,8 +540,8 @@ export function registerIpcHandlers(options: { ipmBaseUrl?: string } = {}): void
               ]
             : [
                 'code',
-                `${process.env.LOCALAPPDATA}\\Programs\\Microsoft VS Code\\bin\\code.cmd`,
-                'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd'
+                String.raw`${process.env.LOCALAPPDATA}\Programs\Microsoft VS Code\bin\code.cmd`,
+                String.raw`C:\Program Files\Microsoft VS Code\bin\code.cmd`
               ]
 
         return new Promise((resolve) => {
@@ -651,8 +648,8 @@ export function registerIpcHandlers(options: { ipmBaseUrl?: string } = {}): void
               ]
             : [
                 'code',
-                `${process.env.LOCALAPPDATA}\\Programs\\Microsoft VS Code\\bin\\code.cmd`,
-                'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd'
+                String.raw`${process.env.LOCALAPPDATA}\Programs\Microsoft VS Code\bin\code.cmd`,
+                String.raw`C:\Program Files\Microsoft VS Code\bin\code.cmd`
               ]
 
         return new Promise((resolve) => {
@@ -728,7 +725,7 @@ export function registerIpcHandlers(options: { ipmBaseUrl?: string } = {}): void
               'powershell.exe',
               ['-NoProfile', '-NonInteractive', '-Command', command],
               { windowsHide: true },
-              (err) => (err ? reject(err) : resolve())
+              (err) => (err ? reject(err as Error) : resolve())
             )
           })
         }

@@ -1,6 +1,4 @@
-export interface Limiter {
-  <T>(fn: () => Promise<T>): Promise<T>
-}
+export type Limiter = <T>(fn: () => Promise<T>) => Promise<T>
 
 /** Returns a function that runs tasks with at most `limit` in flight at once; share one limiter across pools to cap them together */
 export function createLimiter(limit: number): Limiter {

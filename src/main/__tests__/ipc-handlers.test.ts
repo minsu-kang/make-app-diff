@@ -228,6 +228,43 @@ describe('editor:open-in-vscode', () => {
   })
 })
 
+describe('VS Code lookup on Windows', () => {
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+  const requests: [string, object][] = [
+    ['editor:open-in-vscode', { appName: 'my-app', version: '1.0.0', files: [{ path: 'lib/app.js', content: 'x' }] }],
+    [
+      'editor:open-diff',
+      { filePath: 'src/app.js', fromVersion: '1.0.0', toVersion: '2.0.0', oldContent: 'a', newContent: 'b' }
+    ]
+  ]
+
+  beforeEach(() => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    vi.stubEnv('LOCALAPPDATA', String.raw`C:\Users\me\AppData\Local`)
+  })
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', platform)
+    vi.unstubAllEnvs()
+  })
+
+  it.each(requests)('%s tries code, the per-user install and the system install in order', async (channel, opts) => {
+    m.execFile.mockImplementation((_cmd: string, _args: string[], callback: (error: Error | null) => void) =>
+      callback(Object.assign(new Error('not found'), { code: 'ENOENT' }))
+    )
+
+    expect(await invoke(channel, opts)).toEqual({
+      success: false,
+      error: 'VS Code not found. Install "code" CLI command.'
+    })
+    expect(m.execFile.mock.calls.map(([command]) => command)).toEqual([
+      'code',
+      String.raw`C:\Users\me\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
+      String.raw`C:\Program Files\Microsoft VS Code\bin\code.cmd`
+    ])
+  })
+})
+
 describe('clipboard:copy-zip', () => {
   const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
   const opts = { appName: 'my-app', version: '1.0.0', files: [{ path: 'lib/app.js', content: 'x' }] }
