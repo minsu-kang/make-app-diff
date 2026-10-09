@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.4](https://github.com/integromat/make-app-diff/compare/v1.7.3...v1.7.4) (2026-10-09)
+
+
+### Code Refactoring
+
+* clear the mechanical Sonar smells in the main process ([#12](https://github.com/integromat/make-app-diff/issues/12)) ([7215ac2](https://github.com/integromat/make-app-diff/commit/7215ac289c41343e252f104641915fdfef89151e))
+* clear the renderer Sonar smells ([#15](https://github.com/integromat/make-app-diff/issues/15)) ([b67aca6](https://github.com/integromat/make-app-diff/commit/b67aca6b6187261ca750b30f5b52a074b8183d4e))
+* clear the Sonar findings in the decompiler ([#16](https://github.com/integromat/make-app-diff/issues/16)) ([1b752c8](https://github.com/integromat/make-app-diff/commit/1b752c841e0d78b63525bc69218b735b948a1d4f))
+
+
+### Tests
+
+* cover the renderer components and App with jsdom tests ([#14](https://github.com/integromat/make-app-diff/issues/14)) ([add3146](https://github.com/integromat/make-app-diff/commit/add3146be9a4a6222f56c16cc4b79590d607a155))
+
 ## [1.7.3](https://github.com/integromat/make-app-diff/compare/v1.7.2...v1.7.3) (2026-10-09)
 
 
