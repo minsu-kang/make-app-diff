@@ -74,7 +74,7 @@ export default function FileTree({
   fromVersion,
   toVersion,
   viewMode = 'diff'
-}: FileTreeProps) {
+}: Readonly<FileTreeProps>) {
   const [panelWidth, setPanelWidth] = useState(280)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const isResizing = useRef(false)
@@ -146,7 +146,7 @@ export default function FileTree({
       </div>
       <ul className="file-list" role="tree">
         {flatItems.map((item) => {
-          const isSelected = !item.isFolder && item.diff && selectedFile === item.diff.filePath
+          const isSelected = !item.isFolder && item.diff?.filePath === selectedFile
           const activate = (): void => {
             if (item.isFolder) toggleFolder(item.fullPath)
             else if (item.diff) onFileSelect(item.diff.filePath)

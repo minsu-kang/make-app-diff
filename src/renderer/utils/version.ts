@@ -1,5 +1,5 @@
 export function getMajor(version: string): number {
-  return parseInt(version.split('.')[0], 10) || 0
+  return Number.parseInt(version.split('.')[0], 10) || 0
 }
 
 export function compareSemver(a: string, b: string): number {

@@ -29,7 +29,7 @@ export default function VersionSelector({
   onShow,
   loading,
   tags
-}: VersionSelectorProps) {
+}: Readonly<VersionSelectorProps>) {
   const [showDownload, setShowDownload] = useState(false)
   const [showTimeline, setShowTimeline] = useState(false)
   const [downloadVersion, setDownloadVersion] = useState('')
@@ -51,7 +51,7 @@ export default function VersionSelector({
     const ref = toVersion || fromVersion
     let activeMajor: number
     if (ref) {
-      activeMajor = parseInt(ref.split('.')[0], 10)
+      activeMajor = Number.parseInt(ref.split('.')[0], 10)
     } else {
       // Default to the latest version's major
       const sorted = [...versions].sort((a, b) => {
@@ -62,9 +62,9 @@ export default function VersionSelector({
         }
         return 0
       })
-      activeMajor = parseInt(sorted[sorted.length - 1].split('.')[0], 10)
+      activeMajor = Number.parseInt(sorted[sorted.length - 1].split('.')[0], 10)
     }
-    return versions.filter((v) => parseInt(v.split('.')[0], 10) === activeMajor)
+    return versions.filter((v) => Number.parseInt(v.split('.')[0], 10) === activeMajor)
   }, [versions, fromVersion, toVersion])
 
   useEffect(() => {

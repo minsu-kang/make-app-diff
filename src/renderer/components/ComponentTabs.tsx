@@ -20,7 +20,7 @@ export default function ComponentTabs({
   decompile,
   onDecompileToggle,
   onOpenVscode
-}: ComponentTabsProps) {
+}: Readonly<ComponentTabsProps>) {
   const tabs: { key: ComponentType; label: string }[] = [
     { key: 'app', label: 'App' },
     { key: 'account', label: 'Connection' },

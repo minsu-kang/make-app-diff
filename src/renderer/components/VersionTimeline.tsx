@@ -18,7 +18,7 @@ export default function VersionTimeline({
   tags,
   onFromChange,
   onToChange
-}: VersionTimelineProps) {
+}: Readonly<VersionTimelineProps>) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const dragging = useRef<'from' | 'to' | null>(null)
@@ -30,22 +30,22 @@ export default function VersionTimeline({
   // Determine active major version from from/to selection, fallback to latest
   const activeMajor = useMemo(() => {
     const ref = toVersion || fromVersion
-    if (ref) return parseInt(ref.split('.')[0], 10)
-    if (allSorted.length > 0) return parseInt(allSorted[allSorted.length - 1].split('.')[0], 10)
+    if (ref) return Number.parseInt(ref.split('.')[0], 10)
+    if (allSorted.length > 0) return Number.parseInt(allSorted[allSorted.length - 1].split('.')[0], 10)
     return null
   }, [fromVersion, toVersion, allSorted])
 
   // Filter to active major only
   const sorted = useMemo(() => {
     if (activeMajor === null) return allSorted
-    return allSorted.filter((v) => parseInt(v.split('.')[0], 10) === activeMajor)
+    return allSorted.filter((v) => Number.parseInt(v.split('.')[0], 10) === activeMajor)
   }, [allSorted, activeMajor])
 
   // Group by major version (should be single group after filtering)
   const groups = useMemo(() => {
     const map = new Map<number, string[]>()
     for (const v of sorted) {
-      const major = parseInt(v.split('.')[0], 10)
+      const major = Number.parseInt(v.split('.')[0], 10)
       const group = map.get(major)
       if (group) group.push(v)
       else map.set(major, [v])
@@ -192,7 +192,7 @@ export default function VersionTimeline({
       if (!Array.isArray(arr) || arr.length === 0) return null
       let filtered = arr as string[]
       if (activeMajor !== null) {
-        filtered = filtered.filter((v) => parseInt(v.split('.')[0], 10) === activeMajor)
+        filtered = filtered.filter((v) => Number.parseInt(v.split('.')[0], 10) === activeMajor)
       }
       if (filtered.length === 0) return null
       return [...filtered].sort(compareSemver).pop() as string

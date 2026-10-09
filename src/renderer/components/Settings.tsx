@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { IpmSettings } from '../../preload/index'
 import { showToast } from './Toast'
+import TokenField from './TokenField'
 
 interface SettingsProps {
   onClose: () => void
@@ -14,7 +15,7 @@ const themeOptions = [
   { value: 'light', label: 'Light', bg: '#ffffff', accent: '#0071e3' }
 ]
 
-export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
+export default function Settings({ onClose, onSaved, forced }: Readonly<SettingsProps>) {
   const [settings, setSettings] = useState<IpmSettings>({
     host: 'ipme.integromat.com',
     ipmToken: '',
@@ -136,105 +137,25 @@ export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
             </label>
 
             {isIpme ? (
-              <label key="ipme-token">
-                <span>IPME Token</span>
-                <div className="input-with-icon">
-                  <input
-                    type={showIpmeToken ? 'text' : 'password'}
-                    value={settings.ipmeToken}
-                    onChange={(e) => setSettings({ ...settings, ipmeToken: e.target.value })}
-                    placeholder="IPME token value"
-                  />
-                  <button
-                    type="button"
-                    className="btn-icon token-toggle"
-                    onClick={() => setShowIpmeToken(!showIpmeToken)}
-                    title={showIpmeToken ? 'Hide token' : 'Show token'}
-                  >
-                    {showIpmeToken ? (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M2 2l12 12" />
-                        <path d="M6.5 6.5a2 2 0 002.8 2.8" />
-                        <path d="M4.2 4.2C2.8 5.2 1.7 6.5 1 8c1.3 2.8 4 5 7 5 1.2 0 2.3-.3 3.3-.9" />
-                        <path d="M12.5 10.5C13.8 9.5 14.7 8.3 15 8c-1.3-2.8-4-5-7-5-.7 0-1.4.1-2 .3" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M1 8c1.3-2.8 4-5 7-5s5.7 2.2 7 5c-1.3 2.8-4 5-7 5S2.3 10.8 1 8z" />
-                        <circle cx="8" cy="8" r="2" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </label>
+              <TokenField
+                key="ipme-token"
+                label="IPME Token"
+                placeholder="IPME token value"
+                value={settings.ipmeToken}
+                visible={showIpmeToken}
+                onChange={(ipmeToken) => setSettings({ ...settings, ipmeToken })}
+                onToggle={() => setShowIpmeToken(!showIpmeToken)}
+              />
             ) : (
-              <label key="ipm-token">
-                <span>IPM Token</span>
-                <div className="input-with-icon">
-                  <input
-                    type={showIpmToken ? 'text' : 'password'}
-                    value={settings.ipmToken}
-                    onChange={(e) => setSettings({ ...settings, ipmToken: e.target.value })}
-                    placeholder="IPM token value"
-                  />
-                  <button
-                    type="button"
-                    className="btn-icon token-toggle"
-                    onClick={() => setShowIpmToken(!showIpmToken)}
-                    title={showIpmToken ? 'Hide token' : 'Show token'}
-                  >
-                    {showIpmToken ? (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M2 2l12 12" />
-                        <path d="M6.5 6.5a2 2 0 002.8 2.8" />
-                        <path d="M4.2 4.2C2.8 5.2 1.7 6.5 1 8c1.3 2.8 4 5 7 5 1.2 0 2.3-.3 3.3-.9" />
-                        <path d="M12.5 10.5C13.8 9.5 14.7 8.3 15 8c-1.3-2.8-4-5-7-5-.7 0-1.4.1-2 .3" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M1 8c1.3-2.8 4-5 7-5s5.7 2.2 7 5c-1.3 2.8-4 5-7 5S2.3 10.8 1 8z" />
-                        <circle cx="8" cy="8" r="2" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </label>
+              <TokenField
+                key="ipm-token"
+                label="IPM Token"
+                placeholder="IPM token value"
+                value={settings.ipmToken}
+                visible={showIpmToken}
+                onChange={(ipmToken) => setSettings({ ...settings, ipmToken })}
+                onToggle={() => setShowIpmToken(!showIpmToken)}
+              />
             )}
           </div>
 
@@ -251,7 +172,7 @@ export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
                     className={`theme-card${theme === t.value ? ' active' : ''}`}
                     onClick={() => {
                       setTheme(t.value)
-                      document.documentElement.setAttribute('data-theme', t.value)
+                      document.documentElement.dataset.theme = t.value
                     }}
                   >
                     <div className="theme-card-preview">
@@ -272,7 +193,7 @@ export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
               onClick={() => setAdvancedOpen(!advancedOpen)}
             >
               <span className="sidebar-section-chevron" data-collapsed={!advancedOpen ? 'true' : undefined} />
-              Advanced
+              <span>Advanced</span>
             </button>
 
             {advancedOpen && (
@@ -302,7 +223,7 @@ export default function Settings({ onClose, onSaved, forced }: SettingsProps) {
                   className="btn-secondary"
                   onClick={() => {
                     setShowDiscardWarning(false)
-                    document.documentElement.setAttribute('data-theme', initialTheme.current)
+                    document.documentElement.dataset.theme = initialTheme.current
                     onClose()
                   }}
                 >

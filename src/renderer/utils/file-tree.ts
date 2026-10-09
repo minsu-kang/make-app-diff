@@ -60,6 +60,22 @@ export function countFiles(node: TreeNode): number {
   return c
 }
 
+function toFlatItem(child: TreeNode, depth: number, isExpanded: boolean): FlatItem {
+  const isFolder = child.children.size > 0
+  const folderNode: TreeNode = child.file && isFolder ? { ...child, file: null } : child
+  return {
+    key: child.fullPath,
+    isFolder,
+    name: child.name,
+    fullPath: child.fullPath,
+    depth,
+    diff: isFolder ? null : child.file,
+    folderStatus: isFolder ? getFolderStatus(folderNode) : null,
+    fileCount: isFolder ? countFiles(folderNode) : 0,
+    isExpanded
+  }
+}
+
 export function buildFlatList(root: TreeNode, expandedFolders: Set<string>): FlatItem[] {
   const items: FlatItem[] = []
   function visit(node: TreeNode, depth: number): void {
@@ -87,18 +103,7 @@ export function buildFlatList(root: TreeNode, expandedFolders: Set<string>): Fla
           isExpanded: false
         })
       }
-      const folderNode: TreeNode = child.file && isFolder ? { ...child, file: null } : child
-      items.push({
-        key: child.fullPath,
-        isFolder,
-        name: child.name,
-        fullPath: child.fullPath,
-        depth,
-        diff: isFolder ? null : child.file,
-        folderStatus: isFolder ? getFolderStatus(folderNode) : null,
-        fileCount: isFolder ? countFiles(folderNode) : 0,
-        isExpanded
-      })
+      items.push(toFlatItem(child, depth, isExpanded))
       if (isFolder && isExpanded) visit(child, depth + 1)
     }
   }

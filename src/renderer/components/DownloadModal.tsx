@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useId, useCallback } from 'react'
 import type { SearchApp, SearchEntry } from '../../preload/index'
-import { getMajor } from '../utils/version'
+import { buildSearchEntries, entryLabel, getSearchInputValue, moveHighlight } from '../utils/app-search'
+
+const MAX_RESULTS = 30
 
 interface DownloadModalProps {
   onClose: () => void
 }
 
-function HighlightMatch({ text, query }: { text: string; query: string }) {
+function HighlightMatch({ text, query }: Readonly<{ text: string; query: string }>) {
   if (!query.trim()) return <>{text}</>
   const idx = text.toLowerCase().indexOf(query.toLowerCase())
   if (idx === -1) return <>{text}</>
@@ -19,7 +21,7 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
   )
 }
 
-export default function DownloadModal({ onClose }: DownloadModalProps) {
+export default function DownloadModal({ onClose }: Readonly<DownloadModalProps>) {
   const [allApps, setAllApps] = useState<SearchApp[]>([])
   const [loadingApps, setLoadingApps] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -72,34 +74,7 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
     return () => window.removeEventListener('keydown', handler)
   }, [downloadedPath, selectedEntry, selectedVersion, downloading, onClose])
 
-  const filteredEntries = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return []
-
-    const matched = allApps.filter((app) => app.label.toLowerCase().includes(q) || app.name.toLowerCase().includes(q))
-
-    const entries: SearchEntry[] = []
-    for (const app of matched) {
-      const majorGroups = new Map<number, string[]>()
-      for (const v of app.availableVersions) {
-        const major = getMajor(v)
-        const group = majorGroups.get(major)
-        if (group) group.push(v)
-        else majorGroups.set(major, [v])
-      }
-
-      if (majorGroups.size <= 1) {
-        entries.push({ app, major: getMajor(app.version), versions: app.availableVersions })
-      } else {
-        const sortedGroups = [...majorGroups.entries()].sort(([a], [b]) => b - a)
-        for (const [major, versions] of sortedGroups) {
-          entries.push({ app, major, versions })
-        }
-      }
-    }
-
-    return entries.slice(0, 30)
-  }, [searchQuery, allApps])
+  const filteredEntries = useMemo(() => buildSearchEntries(allApps, searchQuery, MAX_RESULTS), [searchQuery, allApps])
 
   const showResults = searchQuery.trim() !== '' && filteredEntries.length > 0
 
@@ -170,11 +145,7 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
                     ? optionId(highlightedIndex)
                     : undefined
                 }
-                value={
-                  selectedEntry && !searchQuery
-                    ? `${selectedEntry.app.label}${allApps.find((a) => a.name === selectedEntry.app.name)?.availableVersions.some((v) => getMajor(v) !== selectedEntry.major) ? ` (v${selectedEntry.major})` : ''}`
-                    : searchQuery
-                }
+                value={getSearchInputValue(selectedEntry, searchQuery)}
                 onChange={(e) => {
                   setSearchQuery(e.target.value)
                   if (selectedEntry) setSelectedEntry(null)
@@ -182,14 +153,10 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowDown') {
                     e.preventDefault()
-                    setHighlightedIndex((prev) =>
-                      filteredEntries.length === 0 ? -1 : (prev + 1) % filteredEntries.length
-                    )
+                    setHighlightedIndex((prev) => moveHighlight(prev, filteredEntries.length, 'down'))
                   } else if (e.key === 'ArrowUp') {
                     e.preventDefault()
-                    setHighlightedIndex((prev) =>
-                      filteredEntries.length === 0 ? -1 : prev <= 0 ? filteredEntries.length - 1 : prev - 1
-                    )
+                    setHighlightedIndex((prev) => moveHighlight(prev, filteredEntries.length, 'up'))
                   } else if (e.key === 'Enter' && highlightedIndex >= 0 && highlightedIndex < filteredEntries.length) {
                     e.preventDefault()
                     e.stopPropagation()
@@ -203,34 +170,28 @@ export default function DownloadModal({ onClose }: DownloadModalProps) {
 
             {showResults && (
               <ul id={listboxId} role="listbox" aria-label="Matching apps" className="download-search-results">
-                {filteredEntries.map((entry, index) => {
-                  const hasMajors = entry.app.availableVersions.some((v) => getMajor(v) !== entry.major)
-                  return (
-                    <li
-                      key={`${entry.app.name}-v${entry.major}`}
-                      id={optionId(index)}
-                      role="option"
-                      aria-selected={index === highlightedIndex}
-                      className={`search-result-item${index === highlightedIndex ? ' highlighted' : ''}`}
-                      onClick={() => handleSelectEntry(entry)}
-                    >
-                      <span className="search-result-label">
-                        <HighlightMatch
-                          text={`${entry.app.label}${hasMajors ? ` (v${entry.major})` : ''}`}
-                          query={searchQuery}
-                        />
-                      </span>
-                      <span className="search-result-name">
-                        <HighlightMatch text={entry.app.name} query={searchQuery} /> · {entry.versions.length} versions
-                      </span>
-                    </li>
-                  )
-                })}
+                {filteredEntries.map((entry, index) => (
+                  <li
+                    key={`${entry.app.name}-v${entry.major}`}
+                    id={optionId(index)}
+                    role="option"
+                    aria-selected={index === highlightedIndex}
+                    className={`search-result-item${index === highlightedIndex ? ' highlighted' : ''}`}
+                    onClick={() => handleSelectEntry(entry)}
+                  >
+                    <span className="search-result-label">
+                      <HighlightMatch text={entryLabel(entry)} query={searchQuery} />
+                    </span>
+                    <span className="search-result-name">
+                      <HighlightMatch text={entry.app.name} query={searchQuery} /> · {entry.versions.length} versions
+                    </span>
+                  </li>
+                ))}
               </ul>
             )}
 
-            {searchQuery.trim() && filteredEntries.length >= 30 && (
-              <div className="search-no-results">Showing first 30 results — refine your search</div>
+            {searchQuery.trim() && filteredEntries.length >= MAX_RESULTS && (
+              <div className="search-no-results">Showing first {MAX_RESULTS} results — refine your search</div>
             )}
 
             {searchQuery.trim() && filteredEntries.length === 0 && !loadingApps && (

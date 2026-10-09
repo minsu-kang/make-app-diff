@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 export interface ToastMessage {
   id: number
@@ -17,13 +17,17 @@ export default function ToastContainer() {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const timersRef = React.useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 
+  const removeToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
   useEffect(() => {
     const timers = timersRef.current
     addToastFn = (msg) => {
       const id = ++toastId
       setToasts((prev) => [...prev, { ...msg, id }])
       const timer = setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id))
+        removeToast(id)
         timers.delete(id)
       }, 4000)
       timers.set(id, timer)
@@ -35,7 +39,7 @@ export default function ToastContainer() {
       }
       timers.clear()
     }
-  }, [])
+  }, [removeToast])
 
   if (toasts.length === 0) return null
 
@@ -44,7 +48,7 @@ export default function ToastContainer() {
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast-${toast.type}`}>
           <span className="toast-text">{toast.text}</span>
-          <button className="toast-close" onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}>
+          <button className="toast-close" onClick={() => removeToast(toast.id)}>
             &times;
           </button>
         </div>

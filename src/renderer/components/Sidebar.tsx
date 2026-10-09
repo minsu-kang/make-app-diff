@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import type { AppInfo, SearchApp, SearchEntry, FavoriteApp, RecentApp } from '../../preload/index'
 import { getMajor } from '../utils/version'
+import { buildSearchEntries, entryLabel, moveHighlight } from '../utils/app-search'
 import { onActivateKey } from '../utils/keyboard'
+
+const MAX_RESULTS = 50
 
 interface SidebarProps {
   onAppSelect: (info: AppInfo) => void
@@ -11,7 +14,13 @@ interface SidebarProps {
   refreshKey?: number
 }
 
-export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appTheme, refreshKey }: SidebarProps) {
+export default function Sidebar({
+  onAppSelect,
+  onSettingsClick,
+  appIcon,
+  appTheme,
+  refreshKey
+}: Readonly<SidebarProps>) {
   const [searchQuery, setSearchQuery] = useState('')
   const [allApps, setAllApps] = useState<SearchApp[]>([])
   const [loadingApps, setLoadingApps] = useState(false)
@@ -77,34 +86,7 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
     }
   }, [refreshKey])
 
-  const filteredEntries = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return []
-
-    const matched = allApps.filter((app) => app.label.toLowerCase().includes(q) || app.name.toLowerCase().includes(q))
-
-    const entries: SearchEntry[] = []
-    for (const app of matched) {
-      const majorGroups = new Map<number, string[]>()
-      for (const v of app.availableVersions) {
-        const major = getMajor(v)
-        const group = majorGroups.get(major)
-        if (group) group.push(v)
-        else majorGroups.set(major, [v])
-      }
-
-      if (majorGroups.size <= 1) {
-        entries.push({ app, major: getMajor(app.version), versions: app.availableVersions })
-      } else {
-        const sortedGroups = [...majorGroups.entries()].sort(([a], [b]) => b - a)
-        for (const [major, versions] of sortedGroups) {
-          entries.push({ app, major, versions })
-        }
-      }
-    }
-
-    return entries.slice(0, 50)
-  }, [searchQuery, allApps])
+  const filteredEntries = useMemo(() => buildSearchEntries(allApps, searchQuery, MAX_RESULTS), [searchQuery, allApps])
 
   // Reset highlighted index when search query changes
   useEffect(() => {
@@ -226,12 +208,10 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {
               e.preventDefault()
-              setHighlightedIndex((prev) => (filteredEntries.length === 0 ? -1 : (prev + 1) % filteredEntries.length))
+              setHighlightedIndex((prev) => moveHighlight(prev, filteredEntries.length, 'down'))
             } else if (e.key === 'ArrowUp') {
               e.preventDefault()
-              setHighlightedIndex((prev) =>
-                filteredEntries.length === 0 ? -1 : prev <= 0 ? filteredEntries.length - 1 : prev - 1
-              )
+              setHighlightedIndex((prev) => moveHighlight(prev, filteredEntries.length, 'up'))
             } else if (e.key === 'Enter' && highlightedIndex >= 0 && highlightedIndex < filteredEntries.length) {
               e.preventDefault()
               handleSelect(filteredEntries[highlightedIndex])
@@ -250,25 +230,18 @@ export default function Sidebar({ onAppSelect, onSettingsClick, appIcon, appThem
 
       {searchQuery.trim() && filteredEntries.length > 0 && (
         <ul className="search-results">
-          {filteredEntries.map((entry, idx) => {
-            const matchedApp = allApps.find((a) => a.name === entry.app.name)
-            const hasMajors = matchedApp ? matchedApp.availableVersions.some((v) => getMajor(v) !== entry.major) : false
-            return (
-              <li
-                key={`${entry.app.name}-v${entry.major}`}
-                className={`search-result-item ${highlightedIndex === idx ? 'highlighted' : ''}`}
-                onClick={() => handleSelect(entry)}
-              >
-                <span className="search-result-label">
-                  {entry.app.label}
-                  {hasMajors ? ` (v${entry.major})` : ''}
-                </span>
-                <span className="search-result-name">
-                  {entry.app.name} · {entry.versions.length} versions
-                </span>
-              </li>
-            )
-          })}
+          {filteredEntries.map((entry, idx) => (
+            <li
+              key={`${entry.app.name}-v${entry.major}`}
+              className={`search-result-item ${highlightedIndex === idx ? 'highlighted' : ''}`}
+              onClick={() => handleSelect(entry)}
+            >
+              <span className="search-result-label">{entryLabel(entry)}</span>
+              <span className="search-result-name">
+                {entry.app.name} · {entry.versions.length} versions
+              </span>
+            </li>
+          ))}
         </ul>
       )}
 

@@ -41,7 +41,7 @@ monaco.editor.defineTheme('makediff-make', makediffMake)
 monaco.editor.defineTheme('makediff-light', makediffLight)
 
 export function getMonacoTheme(): string {
-  const theme = document.documentElement.getAttribute('data-theme') || 'dark'
+  const theme = document.documentElement.dataset.theme || 'dark'
   return `makediff-${theme}`
 }
 

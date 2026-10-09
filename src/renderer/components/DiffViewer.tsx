@@ -67,7 +67,7 @@ export default function DiffViewer({
   viewMode = 'diff',
   fromVersion,
   toVersion
-}: DiffViewerProps) {
+}: Readonly<DiffViewerProps>) {
   const [monacoTheme, setMonacoTheme] = useState(getMonacoTheme)
   const [copied, setCopied] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -178,12 +178,14 @@ export default function DiffViewer({
   const isImage = visibleDiff.oldContent.startsWith('data:image/') || visibleDiff.newContent.startsWith('data:image/')
   const language = getLanguageForFile(selectedFile)
   const pathParts = selectedFile.split('/')
+  const isSingleSided = visibleDiff.status === 'added' || visibleDiff.status === 'deleted'
+  const diffOptions = isSingleSided ? { ...DIFF_EDITOR_OPTIONS, renderSideBySide: false } : DIFF_EDITOR_OPTIONS
 
   return (
     <div className="diff-viewer">
       <div className="diff-file-path">
         {pathParts.map((part, i) => (
-          <React.Fragment key={i}>
+          <React.Fragment key={pathParts.slice(0, i + 1).join('/')}>
             {i > 0 && <span className="diff-file-path-sep">/</span>}
             <span className={i === pathParts.length - 1 ? 'diff-file-path-name' : ''}>{part}</span>
           </React.Fragment>
@@ -214,9 +216,8 @@ export default function DiffViewer({
       </div>
 
       <div className="diff-container">
-        {isImage ? (
-          renderImagePreview(visibleDiff)
-        ) : viewMode === 'show' ? (
+        {isImage && renderImagePreview(visibleDiff)}
+        {!isImage && viewMode === 'show' && (
           <Editor
             language={language}
             value={visibleDiff.newContent ?? visibleDiff.oldContent}
@@ -224,22 +225,14 @@ export default function DiffViewer({
             options={EDITOR_OPTIONS}
             onMount={handleEditorMount}
           />
-        ) : visibleDiff.status === 'added' || visibleDiff.status === 'deleted' ? (
+        )}
+        {!isImage && viewMode !== 'show' && (
           <DiffEditor
             original={visibleDiff.oldContent}
             modified={visibleDiff.newContent}
             language={language}
             theme={monacoTheme}
-            options={{ ...DIFF_EDITOR_OPTIONS, renderSideBySide: false }}
-            onMount={handleDiffEditorMount}
-          />
-        ) : (
-          <DiffEditor
-            original={visibleDiff.oldContent}
-            modified={visibleDiff.newContent}
-            language={language}
-            theme={monacoTheme}
-            options={DIFF_EDITOR_OPTIONS}
+            options={diffOptions}
             onMount={handleDiffEditorMount}
           />
         )}
@@ -259,7 +252,7 @@ function renderImagePreview(diff: FileDiff) {
     }
     return (
       <div className="media-preview">
-        <img src={src} />
+        <img src={src} alt={diff.filePath} />
       </div>
     )
   }
@@ -271,11 +264,19 @@ function renderImagePreview(diff: FileDiff) {
     <div className="media-diff">
       <div className="media-diff-side">
         <div className="media-diff-label">Before</div>
-        {oldSafe ? <img src={diff.oldContent} /> : <div className="media-diff-empty">Not an image</div>}
+        {oldSafe ? (
+          <img src={diff.oldContent} alt={`Before: ${diff.filePath}`} />
+        ) : (
+          <div className="media-diff-empty">Not an image</div>
+        )}
       </div>
       <div className="media-diff-side">
         <div className="media-diff-label">After</div>
-        {newSafe ? <img src={diff.newContent} /> : <div className="media-diff-empty">Not an image</div>}
+        {newSafe ? (
+          <img src={diff.newContent} alt={`After: ${diff.filePath}`} />
+        ) : (
+          <div className="media-diff-empty">Not an image</div>
+        )}
       </div>
     </div>
   )

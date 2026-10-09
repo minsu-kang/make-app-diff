@@ -57,7 +57,7 @@ export default function App() {
     window.api.theme
       .load()
       .then((theme) => {
-        document.documentElement.setAttribute('data-theme', theme)
+        document.documentElement.dataset.theme = theme
       })
       .catch((error: unknown) => console.error('Failed to load the theme', error))
 
@@ -73,7 +73,7 @@ export default function App() {
         }
         return window.api.settings.load().then((settings) => {
           const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
-          if (!token || !token.trim()) {
+          if (!token?.trim()) {
             setForcedSettings(true)
             setShowSettings(true)
           } else {
