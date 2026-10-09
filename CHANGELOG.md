@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.2](https://github.com/integromat/make-app-diff/compare/v1.7.1...v1.7.2) (2026-10-09)
+
+
+### Tests
+
+* add IPC integration tests and run CI on Node 24 ([#6](https://github.com/integromat/make-app-diff/issues/6)) ([2fb5a5d](https://github.com/integromat/make-app-diff/commit/2fb5a5d1ec6ad059950b69972a49d2cc6d6fffc1))
+* add Playwright Electron end-to-end tests ([#8](https://github.com/integromat/make-app-diff/issues/8)) ([30dd119](https://github.com/integromat/make-app-diff/commit/30dd11983818a797c8ee10ca388329e2b4ad4b12))
+
+
+### Continuous Integration
+
+* add the SonarQube scan ([#9](https://github.com/integromat/make-app-diff/issues/9)) ([bf0fa56](https://github.com/integromat/make-app-diff/commit/bf0fa5655bc07f08309c575a297bc5ad43b0852d))
+
 ## [1.7.1](https://github.com/integromat/make-app-diff/compare/v1.7.0...v1.7.1) (2026-10-08)
 
 
