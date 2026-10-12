@@ -22,7 +22,7 @@ npm run lint:fix     # Run ESLint with auto-fix
 npm run format       # Format code with Prettier
 npm run format:check # Check formatting
 npm run typecheck    # Type check node and web projects with tsc
-npm run test         # Run unit tests (vitest: node project for main/utils, jsdom project for the renderer)
+npm run test         # Run unit tests (vitest: node project for main and the renderer .test.ts files, jsdom project for the renderer .test.tsx files)
 npm run test:coverage # Run tests with coverage report
 npm run test:integration # Run IPC integration tests (faked IPM server)
 npm run test:e2e     # Build, then run the Playwright Electron tests (opens real windows)
@@ -35,7 +35,7 @@ npm run postinstall  # Install Electron app deps (runs automatically)
 Three-process structure:
 - `src/main/` — Electron main process (IPC handlers, services)
 - `src/preload/` — Exposes API to renderer via contextBridge
-- `src/renderer/` — React SPA (components, styles)
+- `src/renderer/` — React SPA: `app/` (root), `features/` (one folder per feature), `shared/` (api, types, ui, utils), `monaco/`, `styles/`
 
 ### IPC Pattern
 
@@ -72,9 +72,9 @@ All IPC handlers return `IpcResult<T>`:
 - `src/main/index.ts` — Window creation, menu setup
 - `src/main/ipc-handlers.ts` — All IPC channel registration
 - `src/preload/index.ts` — Exposes `window.api`, `window.appVersion`, `window.onMenu`
-- `src/renderer/App.tsx` — Root component, state management
+- `src/renderer/app/App.tsx` — Root component, state management
 - `src/renderer/__tests__/setup.ts` and `mocks/` — jsdom test setup: typed `window.api` fake and Monaco fakes
-- `src/renderer/monaco-setup.ts` — Monaco worker config, loader, language/theme registration
-- `src/renderer/languages/imljson.ts` — IMLJSON Monarch tokenizer (JSON + IML `{{expressions}}`)
-- `src/renderer/themes/monaco-themes.ts` — 3 Monaco themes (dark/make/light)
+- `src/renderer/monaco/monaco-setup.ts` — Monaco worker config, loader, language/theme registration
+- `src/renderer/monaco/languages/imljson.ts` — IMLJSON Monarch tokenizer (JSON + IML `{{expressions}}`)
+- `src/renderer/monaco/themes/monaco-themes.ts` — 3 Monaco themes (dark/make/light)
 - `src/renderer/styles/global.css` — All styles + themes (dark/make/light)

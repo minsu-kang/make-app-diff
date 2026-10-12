@@ -32,10 +32,9 @@ export default defineConfig({
       reporter: ['text', 'json-summary', 'lcov'],
       include: [
         'src/main/services/**/*.ts',
-        'src/renderer/utils/**/*.ts',
-        'src/renderer/components/**/*.tsx',
-        'src/renderer/shared/**/*.{ts,tsx}',
-        'src/renderer/App.tsx'
+        'src/renderer/app/**/*.{ts,tsx}',
+        'src/renderer/features/**/*.{ts,tsx}',
+        'src/renderer/shared/**/*.{ts,tsx}'
       ],
       exclude: ['src/main/services/__tests__/**', 'src/renderer/**/__tests__/**', 'src/renderer/shared/types/**'],
       thresholds: {

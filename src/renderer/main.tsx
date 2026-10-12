@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import './monaco-setup'
-import App from './App'
+import './monaco/monaco-setup'
+import App from './app/App'
 import './styles/global.css'
 
 const rootElement = document.getElementById('root')

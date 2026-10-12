@@ -54,10 +54,11 @@ src/
   main/           # Main process — API calls, file I/O, IPC handlers
     services/     # ipm-client, pkr-extractor, diff-service, decompiler, storage
   preload/        # Bridge — exposes window.api via contextBridge
-  renderer/       # React SPA — components, styles
-    components/   # App, FileTree, DiffViewer, SettingsModal, etc.
-    languages/    # IMLJSON Monarch tokenizer
-    themes/       # Monaco theme definitions (dark/make/light)
+  renderer/       # React SPA
+    app/          # App (root component and state)
+    features/     # sidebar, version-selector, diff, settings, download
+    shared/       # api (window bridge), types, ui, utils
+    monaco/       # Monaco setup, IMLJSON tokenizer, themes (dark/make/light)
     styles/       # global.css (all styles + themes)
 ```
 

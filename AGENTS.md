@@ -18,7 +18,7 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 
 - **Main process**: Business logic only (API calls, file I/O, storage)
 - **Preload**: Minimal bridge — expose IPC via `contextBridge`, nothing else
-- **Renderer**: UI only — never access Node.js APIs directly. It reaches the bridge only through `src/renderer/shared/api` (`getApi()`, `getMenuEvents()`, `getAppVersion()`, each reads `window` at call time) and takes types only from `src/renderer/shared/types`. ESLint enforces both, and, once the `app/`, `features/` and `monaco/` folders exist, keeps `shared/` and `monaco/` from importing the layers above them and a feature from importing another feature
+- **Renderer**: UI only — never access Node.js APIs directly. It reaches the bridge only through `src/renderer/shared/api` (`getApi()`, `getMenuEvents()`, `getAppVersion()`, each reads `window` at call time) and takes types only from `src/renderer/shared/types`. ESLint enforces both, and also keeps `shared/` and `monaco/` from importing the layers above them and a feature from importing another feature (see Renderer Structure)
 
 ### Adding a new IPC channel
 
@@ -32,7 +32,7 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 1. Add to `buildMenu()` in `src/main/index.ts`
 2. Send event via `mainWindow.webContents.send('menu:event-name')`
 3. Register listener in preload `window.onMenu`
-4. Handle in `App.tsx` useEffect
+4. Handle in `app/App.tsx` useEffect
 
 ## IPM API Reference
 
@@ -200,17 +200,20 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 Three themes: `dark` (default, Catppuccin-inspired), `make` (Make.com purple), `light` (Apple-inspired)
 - Theme stored via electron-store, applied as `data-theme` attribute on `<html>`
 - CSS variables in `global.css` for layout/UI colors
-- Monaco editor themes defined in `themes/monaco-themes.ts` (`makediff-dark`, `makediff-make`, `makediff-light`)
+- Monaco editor themes defined in `monaco/themes/monaco-themes.ts` (`makediff-dark`, `makediff-make`, `makediff-light`)
 - DiffViewer observes `data-theme` changes and calls `getMonacoTheme()` to sync
 
-## useIpc Hook
+## Renderer Structure
 
-```ts
-useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
-```
-- Auto-handles loading/error states
-- Returns null on error (both `success: false` and exceptions)
-- `setData` for imperative state overrides
+`src/renderer/` has four layers and a few root files:
+
+- `app/`: `App.tsx`, the root component and its state
+- `features/<name>/`: one folder per feature (`sidebar`, `version-selector`, `diff`, `settings`, `download`) with its components, helpers and a `__tests__/` folder
+- `shared/`: `api/` (the only code that reads the preload bridge objects on `window`), `types/` (the only import point for preload and main types), `ui/` (`Toast`) and `utils/`
+- `monaco/`: `monaco-setup.ts`, the IMLJSON tokenizer in `languages/` and the themes in `themes/`
+- Root: `main.tsx`, `index.html`, `env.d.ts`, `styles/global.css`, and `__tests__/` with the test setup and the `window` fakes
+
+Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature uses `shared` and `monaco`; `monaco` uses `shared`; `shared` imports nothing from the other layers; a feature imports no other feature, so code that two features need moves to `shared/`. ESLint enforces this for static imports (`eslint.config.mjs`). The per-feature rules are generated from the folders in `features/`, so a new feature folder is covered without a config change. A test sits in the `__tests__/` folder next to the code it covers.
 
 ## Electron Window Config
 
@@ -234,14 +237,14 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 
 ## UI Components
 
-### FileTree (`FileTree.tsx`)
+### FileTree (`features/diff/FileTree.tsx`)
 - IDE-style folder tree with indent guides (vertical lines per depth level)
 - CSS triangle chevrons for folders, SVG file icons by extension
 - File/folder name color indicates status: green=added, yellow=modified, red=deleted
 - Resizable panel (drag right edge, 180–600px range)
 - Starts collapsed; user expands folders manually
 
-### DiffViewer (`DiffViewer.tsx`)
+### DiffViewer (`features/diff/DiffViewer.tsx`)
 - Uses Monaco DiffEditor (`@monaco-editor/react`) for all diff/code views
 - Diff mode + modified: `DiffEditor` side-by-side (`renderSideBySide: true`)
 - Diff mode + added/deleted: `DiffEditor` inline (`renderSideBySide: false`)
@@ -254,44 +257,44 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Expand All button: reveals all collapsed unchanged regions
 - Theme synced via MutationObserver on `data-theme` attribute → `getMonacoTheme()`
 
-### Sidebar (`Sidebar.tsx`)
+### Sidebar (`features/sidebar/Sidebar.tsx`)
 - Search input with Cmd+K focus shortcut
 - Favorites (star toggle) and Recents sections (collapsible)
 - Version grouping by major version number
 
-### VersionSelector (`VersionSelector.tsx`)
+### VersionSelector (`features/version-selector/VersionSelector.tsx`)
 - From/To dropdowns with swap button, Compare button (Cmd+Enter)
 - Inline download row with Show, Download, and Copy ZIP buttons
 - Copy ZIP: creates ZIP archive → copies file reference to clipboard (macOS: `NSFilenamesPboardType`, Windows: PowerShell `CF_HDROP`)
 - Version timeline toggle
 
-### VersionTimeline (`VersionTimeline.tsx`)
+### VersionTimeline (`features/version-selector/VersionTimeline.tsx`)
 - Horizontal timeline with drag-to-select from/to nodes
 - Groups by major version, shows environment tags (staging/production/stable)
 - Range highlighting between from and to
 
-### ComponentTabs (`ComponentTabs.tsx`)
+### ComponentTabs (`features/diff/ComponentTabs.tsx`)
 - App / Connection / Webhook tabs with colored change count badges
 
-### DownloadModal (`DownloadModal.tsx`)
+### DownloadModal (`features/download/DownloadModal.tsx`)
 - Search + select app, pick version, download to folder
 - Search input is an ARIA combobox: the listbox is driven from the input (ArrowUp/Down, Enter) via `aria-activedescendant`, and the highlighted row scrolls into view
 - Success state with Show in Finder action
 
-### Settings (`Settings.tsx`)
+### Settings (`features/settings/Settings.tsx`)
 - Connection (host, token), Appearance (theme picker), Advanced (IPM version)
 - Dirty state tracking with discard warning; theme reverts on discard
 - Enter saves, Escape closes (with dirty check)
 
-### Toast (`Toast.tsx`)
+### Toast (`shared/ui/Toast.tsx`)
 - Global toast notifications via `showToast(text, type)` function
 - Auto-dismiss after 4s, supports error/success/info types
 
-### Monaco Setup (`monaco-setup.ts`)
+### Monaco Setup (`monaco/monaco-setup.ts`)
 - Local Monaco loading via `loader.config({ monaco })` — no CDN, Electron offline support
 - Workers: `editor.worker` (default), `json.worker` (JSON/IMLJSON), `ts.worker` (JS/TS), `css.worker`, `html.worker`. JS/TS/CSS diagnostics are off (read-only viewer, no error underlines)
-- IMLJSON language: Monarch tokenizer in `languages/imljson.ts` (JSON + `{{IML}}` + `rpc://`)
-- 3 themes in `themes/monaco-themes.ts`: `makediff-dark`, `makediff-make`, `makediff-light`
+- IMLJSON language: Monarch tokenizer in `monaco/languages/imljson.ts` (JSON + `{{IML}}` + `rpc://`)
+- 3 themes in `monaco/themes/monaco-themes.ts`: `makediff-dark`, `makediff-make`, `makediff-light`
 - Helpers: `getMonacoTheme()` (reads `data-theme`), `getLanguageForFile(path)` (ext→language map)
 
 ## Common Pitfalls
@@ -306,7 +309,7 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 - Main process changes (services, IPC handlers) require app restart — renderer hot reloads
 - Compiled custom app functions.js exports strings, not function objects
 - Some apps use `communication` array pattern (e.g. Google Drive) — base fields are inside each step
-- `filterDiffs` in App.tsx must handle both compiled (`accounts/`, `hooks/`) and SDK (`connections/`, `webhooks/`) folder prefixes
+- `filterDiffs` in `app/App.tsx` must handle both compiled (`accounts/`, `hooks/`) and SDK (`connections/`, `webhooks/`) folder prefixes
 - Electron `editMenu` role required for Cmd+A/C/V/X to work in renderer
 - Platform-conditional window config: `titleBarStyle`/`trafficLightPosition` only on macOS
 - Menu items `download-app`, `open-settings`, `about` disabled until settings are validated via `enableMenuItems()`
@@ -327,7 +330,7 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 
 ## Testing
 
-- `npm run test` and `npm run test:coverage` run the unit tests in two vitest projects: `node` (`src/main/__tests__/**`, `src/main/services/__tests__/**` and `src/renderer/**/__tests__/**/*.test.ts`, minus `*.integration.test.ts`) and `renderer` (`src/renderer/**/__tests__/**/*.test.tsx`, jsdom, React Testing Library). One coverage report with one set of thresholds covers `src/main/services`, `src/renderer/utils`, `src/renderer/components`, `src/renderer/shared` and `App.tsx`
+- `npm run test` and `npm run test:coverage` run the unit tests in two vitest projects: `node` (`src/main/__tests__/**`, `src/main/services/__tests__/**` and `src/renderer/**/__tests__/**/*.test.ts`, minus `*.integration.test.ts`) and `renderer` (`src/renderer/**/__tests__/**/*.test.tsx`, jsdom, React Testing Library). One coverage report with one set of thresholds covers `src/main/services`, `src/renderer/app`, `src/renderer/features` and `src/renderer/shared`
 - Renderer tests install fresh `window.api`, `window.onMenu` and `window.appVersion` mocks before every test (`src/renderer/__tests__/mocks/window-api.ts`, typed against the preload API, so a new IPC method breaks the typecheck until the factory has it). Read and override them with `mockApi()` and `mockMenu()`. `setup.ts` also mocks `@monaco-editor/react` and `monaco-editor` for every test, because jsdom cannot load the real editor, and stubs `scrollIntoView`. It also clears all mocks before and restores all spies after every test. `Toast` keeps one module-level handler, so a test renders one `ToastContainer` at a time
 - A renderer test file must import nothing that needs Chromium layout or workers; use the e2e tests for that. A renderer `.test.ts` runs in the `node` project, so it can use neither `window` nor React; a test that needs either is a `.test.tsx` and runs in jsdom. `esbuild.jsx` is `automatic` in the `renderer` project because only `tsconfig.web.json` sets `jsx`
 - `npm run test:integration` runs `src/main/__tests__/integration/*.integration.test.ts` (separate vitest config, `integration` CI job). They register the real IPC handlers and run the real `IpmClient`, PKR extraction, decompiler, diff and storage code against a faked IPM server (`nock` with the network closed, PKR archives built with `packSync`)
