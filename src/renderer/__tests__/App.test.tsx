@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import App from '../App'
 import { fail, mockApi, mockMenu, ok } from './mocks/window-api'
@@ -21,6 +21,7 @@ const SESSION_EXPIRED = 'Session expired (48h inactive). Please re-enter your to
 const IPME_HOST = 'ipme.integromat.com'
 const ICON = 'data:image/png;base64,iVBORw0KGgo='
 const HALF_HOUR = 30 * 60 * 1000
+const TWENTY_MINUTES = 20 * 60 * 1000
 const DOWNLOAD_TOGGLE = 'Download version'
 const THEME_ATTR = 'data-theme'
 const CONNECTIONS_DIR = 'connections'
@@ -178,6 +179,13 @@ async function renderPendingShow(user: UserEvent) {
   await showFromDownload(user, '2.1.0')
   expect(await screen.findByText(LOADING)).toBeInTheDocument()
   return pending
+}
+
+async function renderShownFromVersion(user: UserEvent) {
+  stubApps(slackInfo)
+  render(<App />)
+  await selectApp(user)
+  await showFromDownload(user, '2.0.0')
 }
 
 function closestOverlay(element: HTMLElement): HTMLElement {
@@ -1197,7 +1205,7 @@ describe('App', () => {
       expect(screen.queryByText(LOADING)).not.toBeInTheDocument()
     })
 
-    it('retries a failed Show with the same version instead of comparing', async () => {
+    it('retries a failed Show of the To version instead of comparing', async () => {
       const user = userEvent.setup()
       const api = mockApi()
       stubApps(slackInfo)
@@ -1213,6 +1221,52 @@ describe('App', () => {
       expect(screen.queryByText(NOT_FOUND)).not.toBeInTheDocument()
       expect(api.ipm.showVersion).toHaveBeenNthCalledWith(2, 'slack', '2.1.0', true)
       expect(api.ipm.getDiff).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('a shown version that is not the To version', () => {
+    it('retries a failed Show with the To version, not the version that was shown', async () => {
+      const user = userEvent.setup()
+      const api = mockApi()
+      api.ipm.showVersion.mockResolvedValueOnce(fail(NOT_FOUND)).mockResolvedValueOnce(ok(diffResult))
+      await renderShownFromVersion(user)
+      expect(await screen.findByText(NOT_FOUND)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+      expect(await screen.findByText('Files (1)')).toBeInTheDocument()
+      expect(api.ipm.showVersion).toHaveBeenNthCalledWith(1, 'slack', '2.0.0', true)
+      expect(api.ipm.showVersion).toHaveBeenNthCalledWith(2, 'slack', '2.1.0', true)
+      expect(api.ipm.getDiff).not.toHaveBeenCalled()
+    })
+
+    it('refetches the To version when the SDK view is toggled', async () => {
+      const user = userEvent.setup()
+      const api = mockApi()
+      api.ipm.showVersion.mockResolvedValue(ok({ ...diffResult, isCustomApp: true }))
+      await renderShownFromVersion(user)
+      expect(await screen.findByTitle(RAW_TOGGLE)).toBeInTheDocument()
+      expect(api.ipm.showVersion).toHaveBeenLastCalledWith('slack', '2.0.0', true)
+
+      await user.click(screen.getByTitle(RAW_TOGGLE))
+
+      expect(api.ipm.showVersion).toHaveBeenCalledTimes(2)
+      expect(api.ipm.showVersion).toHaveBeenNthCalledWith(2, 'slack', '2.1.0', false)
+      expect(await screen.findByTitle(SDK_TOGGLE)).toBeInTheDocument()
+    })
+
+    it('exports the files under the To version', async () => {
+      const user = userEvent.setup()
+      const api = mockApi()
+      api.ipm.showVersion.mockResolvedValue(ok(diffResult))
+      await renderShownFromVersion(user)
+
+      await user.click(await screen.findByTitle(VSCODE_TITLE))
+
+      expect(api.editor.openInVscode).toHaveBeenCalledOnce()
+      expect(api.editor.openInVscode).toHaveBeenCalledWith(
+        expect.objectContaining({ appName: 'slack', version: '2.1.0' })
+      )
     })
   })
 
@@ -1335,6 +1389,23 @@ describe('App', () => {
       const editor = screen.getByTestId('editor')
       expect(editor).toHaveAttribute('data-value', 'b')
       expect(editor).toHaveAttribute('data-language', 'imljson')
+    })
+
+    it('keeps the opened folders expanded while a file is selected', async () => {
+      const user = userEvent.setup()
+      stubApps(slackInfo)
+      mockApi().ipm.getDiff.mockResolvedValue(ok(tabbedDiff))
+      render(<App />)
+      await selectApp(user)
+      await compare(user)
+      expect(await screen.findByText(NO_FILE)).toBeInTheDocument()
+
+      await openFile(user, moduleFilePath)
+
+      expect(screen.getByTestId('diff-editor')).toBeInTheDocument()
+      expect(screen.getByRole('treeitem', { name: /^modules/ })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('treeitem', { name: /^send/ })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('treeitem', { name: /api\.imljson/ })).toHaveAttribute('aria-selected', 'true')
     })
   })
 
@@ -1482,6 +1553,45 @@ describe('App', () => {
 
       await user.click(screen.getByRole('button', { name: 'OK' }))
       expect(screen.queryByText('Download Complete')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('re-rendering', () => {
+    it('registers the menu listeners and runs the startup work once however often App renders', async () => {
+      const user = userEvent.setup()
+      const api = mockApi()
+      const menu = mockMenu()
+      await renderApp()
+
+      await user.click(screen.getByTitle('Hide sidebar'))
+      await user.click(screen.getByTitle('Show sidebar'))
+      act(() => menu.emit('showInfo'))
+      expect(screen.getByRole('heading', { name: 'About' })).toBeInTheDocument()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('heading', { name: 'About' })).not.toBeInTheDocument()
+
+      expect(menu.openSettings).toHaveBeenCalledOnce()
+      expect(menu.downloadApp).toHaveBeenCalledOnce()
+      expect(menu.showInfo).toHaveBeenCalledOnce()
+      expect(api.theme.load).toHaveBeenCalledOnce()
+      expect(api.settings.load).toHaveBeenCalledOnce()
+      expect(api.session.check).toHaveBeenCalledOnce()
+      expect(api.menu.setEnabled).toHaveBeenCalledOnce()
+    })
+
+    it('keeps the 30 minute session check on its original schedule when App re-renders', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const api = mockApi()
+      await renderApp()
+      await act(() => vi.advanceTimersByTimeAsync(TWENTY_MINUTES))
+
+      fireEvent.click(screen.getByTitle('Hide sidebar'))
+      act(() => mockMenu().emit('showInfo'))
+      expect(api.session.check).toHaveBeenCalledTimes(1)
+
+      await act(() => vi.advanceTimersByTimeAsync(HALF_HOUR - TWENTY_MINUTES))
+
+      expect(api.session.check).toHaveBeenCalledTimes(2)
     })
   })
 })
