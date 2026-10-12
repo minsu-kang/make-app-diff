@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useMemo, useRef } from 'react'
 import type { AppInfo, FileDiff, DiffResult } from '../shared/types'
 import Sidebar from '../features/sidebar/Sidebar'
 import Settings from '../features/settings/Settings'
@@ -8,9 +8,12 @@ import ComponentTabs from '../features/diff/ComponentTabs'
 import FileTree from '../features/diff/FileTree'
 import DiffViewer from '../features/diff/DiffViewer'
 import ToastContainer, { showToast } from '../shared/ui/Toast'
-import { getApi, getMenuEvents } from '../shared/api/electron-api'
+import { getApi } from '../shared/api/electron-api'
 import EmptyState from './EmptyState'
 import AboutModal from './AboutModal'
+import { useShellUi } from './hooks/use-shell-ui'
+import { useMenuEvents } from './hooks/use-menu-events'
+import { useSession } from './hooks/use-session'
 
 type TabType = 'app' | 'account' | 'hook'
 
@@ -33,9 +36,22 @@ function countChanges(diffs: FileDiff[]): { added: number; deleted: number; modi
 }
 
 export default function App() {
-  const [showSettings, setShowSettings] = useState(false)
-  const [forcedSettings, setForcedSettings] = useState(false)
-  const [appListRefreshKey, setAppListRefreshKey] = useState(0)
+  const {
+    showSettings,
+    setShowSettings,
+    forcedSettings,
+    setForcedSettings,
+    appListRefreshKey,
+    setAppListRefreshKey,
+    showDownloadModal,
+    setShowDownloadModal,
+    showInfo,
+    setShowInfo,
+    sidebarCollapsed,
+    setSidebarCollapsed
+  } = useShellUi()
+  useMenuEvents({ setShowSettings, setShowDownloadModal, setShowInfo })
+  useSession({ setForcedSettings, setShowSettings })
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
   const [fromVersion, setFromVersion] = useState('')
   const [toVersion, setToVersion] = useState('')
@@ -44,88 +60,11 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [showDownloadModal, setShowDownloadModal] = useState(false)
-  const [showInfo, setShowInfo] = useState(false)
   const [appIcon, setAppIcon] = useState<string | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [viewMode, setViewMode] = useState<'diff' | 'show'>('diff')
   const [decompile, setDecompile] = useState(true)
   // Bumped whenever a Show/Compare starts or the selected app changes, so a response for an older request is dropped
   const requestIdRef = useRef(0)
-
-  useEffect(() => {
-    const cleanupSettings = getMenuEvents().openSettings(() => setShowSettings(true))
-    const cleanupDownload = getMenuEvents().downloadApp(() => setShowDownloadModal(true))
-    const cleanupInfo = getMenuEvents().showInfo(() => setShowInfo(true))
-    getApi()
-      .theme.load()
-      .then((theme) => {
-        document.documentElement.dataset.theme = theme
-      })
-      .catch((error: unknown) => console.error('Failed to load the theme', error))
-
-    // Check session expiry, then check if token exists
-    getApi()
-      .session.check()
-      .then(({ expired }) => {
-        if (expired) {
-          showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
-          setForcedSettings(true)
-          setShowSettings(true)
-          return
-        }
-        return getApi()
-          .settings.load()
-          .then((settings) => {
-            const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
-            if (!token?.trim()) {
-              setForcedSettings(true)
-              setShowSettings(true)
-            } else {
-              // Tokens exist and session is valid — enable menu items
-              getApi().menu.setEnabled(true)
-            }
-          })
-      })
-      .catch((error: unknown) => {
-        console.error('Failed to check the session', error)
-        showToast('Could not check the session. Open Settings to verify your tokens.', 'error')
-      })
-
-    // Periodic session check (every 30 minutes)
-    const sessionInterval = setInterval(
-      async () => {
-        try {
-          const { expired } = await getApi().session.check()
-          if (expired) {
-            showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
-            getApi().menu.setEnabled(false)
-            setForcedSettings(true)
-            setShowSettings(true)
-          }
-        } catch (error) {
-          console.error('Failed to check the session', error)
-        }
-      },
-      30 * 60 * 1000
-    )
-
-    return () => {
-      clearInterval(sessionInterval)
-      cleanupSettings()
-      cleanupDownload()
-      cleanupInfo()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!showInfo) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === 'Enter') setShowInfo(false)
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [showInfo])
 
   const invalidateRequests = useCallback(() => {
     requestIdRef.current++

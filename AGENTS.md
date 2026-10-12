@@ -32,7 +32,7 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 1. Add to `buildMenu()` in `src/main/index.ts`
 2. Send event via `mainWindow.webContents.send('menu:event-name')`
 3. Register listener in preload `window.onMenu`
-4. Handle in `app/App.tsx` useEffect
+4. Register the listener in `app/hooks/use-menu-events.ts`, keep the state it sets in `app/hooks/use-shell-ui.ts`, and pass the setter in `app/App.tsx`
 
 ## IPM API Reference
 
@@ -207,7 +207,7 @@ Three themes: `dark` (default, Catppuccin-inspired), `make` (Make.com purple), `
 
 `src/renderer/` has four layers and a few root files:
 
-- `app/`: `App.tsx`, the root component and its state, with `EmptyState` and `AboutModal`, the parts that have no state of their own
+- `app/`: `App.tsx`, the root component, with `EmptyState` and `AboutModal` (the parts that have no state of their own) and `hooks/`: `use-shell-ui` holds the dialog and sidebar state, `use-menu-events` the menu listeners, and `use-session` the theme load and the session checks
 - `features/<name>/`: one folder per feature (`sidebar`, `version-selector`, `diff`, `settings`, `download`) with its components, helpers and a `__tests__/` folder
 - `shared/`: `api/` (the only code that reads the preload bridge objects on `window`), `types/` (the only import point for preload and main types), `ui/` (`Toast`, `MakeLogo`) and `utils/`
 - `monaco/`: `monaco-setup.ts`, the IMLJSON tokenizer in `languages/` and the themes in `themes/`
