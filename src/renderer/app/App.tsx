@@ -1,5 +1,3 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react'
-import type { AppInfo, FileDiff, DiffResult } from '../shared/types'
 import Sidebar from '../features/sidebar/Sidebar'
 import Settings from '../features/settings/Settings'
 import DownloadModal from '../features/download/DownloadModal'
@@ -7,33 +5,15 @@ import VersionSelector from '../features/version-selector/VersionSelector'
 import ComponentTabs from '../features/diff/ComponentTabs'
 import FileTree from '../features/diff/FileTree'
 import DiffViewer from '../features/diff/DiffViewer'
-import ToastContainer, { showToast } from '../shared/ui/Toast'
-import { getApi } from '../shared/api/electron-api'
+import ToastContainer from '../shared/ui/Toast'
 import EmptyState from './EmptyState'
 import AboutModal from './AboutModal'
 import { useShellUi } from './hooks/use-shell-ui'
 import { useMenuEvents } from './hooks/use-menu-events'
 import { useSession } from './hooks/use-session'
-
-type TabType = 'app' | 'account' | 'hook'
-
-function filterDiffs(diffs: FileDiff[], tab: TabType): FileDiff[] {
-  return diffs.filter((d) => {
-    const isAccount = d.filePath.startsWith('accounts/') || d.filePath.startsWith('connections/')
-    const isHook = d.filePath.startsWith('hooks/') || d.filePath.startsWith('webhooks/')
-    if (tab === 'account') return isAccount
-    if (tab === 'hook') return isHook
-    return !isAccount && !isHook
-  })
-}
-
-function countChanges(diffs: FileDiff[]): { added: number; deleted: number; modified: number } {
-  return {
-    added: diffs.filter((d) => d.status === 'added').length,
-    deleted: diffs.filter((d) => d.status === 'deleted').length,
-    modified: diffs.filter((d) => d.status === 'modified').length
-  }
-}
+import { useDiffState } from './hooks/use-diff-state'
+import { useDiffRequest } from './hooks/use-diff-request'
+import { useAppSelection } from './hooks/use-app-selection'
 
 export default function App() {
   const {
@@ -52,179 +32,42 @@ export default function App() {
   } = useShellUi()
   useMenuEvents({ setShowSettings, setShowDownloadModal, setShowInfo })
   useSession({ setForcedSettings, setShowSettings })
-  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
-  const [fromVersion, setFromVersion] = useState('')
-  const [toVersion, setToVersion] = useState('')
-  const [diffResult, setDiffResult] = useState<DiffResult | null>(null)
-  const [activeTab, setActiveTab] = useState<TabType>('app')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [appIcon, setAppIcon] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'diff' | 'show'>('diff')
-  const [decompile, setDecompile] = useState(true)
-  // Bumped whenever a Show/Compare starts or the selected app changes, so a response for an older request is dropped
-  const requestIdRef = useRef(0)
-
-  const invalidateRequests = useCallback(() => {
-    requestIdRef.current++
-    setLoading(false)
-  }, [])
-
-  const handleFromChange = useCallback(
-    (version: string) => {
-      invalidateRequests()
-      setFromVersion(version)
-    },
-    [invalidateRequests]
-  )
-
-  const handleToChange = useCallback(
-    (version: string) => {
-      invalidateRequests()
-      setToVersion(version)
-    },
-    [invalidateRequests]
-  )
-
-  const handleAppSelect = useCallback(
-    (info: AppInfo) => {
-      invalidateRequests()
-      setAppInfo(info)
-      setDiffResult(null)
-      setSelectedFile(null)
-      setError(null)
-      setAppIcon(null)
-      setDecompile(true)
-
-      // Fetch app icon from /admin/icon/apps/{appName}
-      getApi()
-        .ipm.getAppIcon(info.name)
-        .then((result) => {
-          if (result.success && result.data) {
-            setAppIcon(result.data)
-          }
-        })
-        .catch((error: unknown) => {
-          console.error('Failed to load app icon', error)
-        })
-
-      // Auto-select previous → latest version pairing
-      const versions = info.versions || []
-      if (versions.length >= 2) {
-        setFromVersion(versions[1])
-        setToVersion(versions[0])
-      } else if (versions.length === 1) {
-        setFromVersion('')
-        setToVersion(versions[0])
-      } else {
-        setFromVersion('')
-        setToVersion('')
-      }
-    },
-    [invalidateRequests]
-  )
-
-  const handleSwap = useCallback(() => {
-    invalidateRequests()
-    setFromVersion(toVersion)
-    setToVersion(fromVersion)
-  }, [fromVersion, toVersion, invalidateRequests])
-
-  const handleCompare = useCallback(
-    async (decompileFlag?: boolean) => {
-      if (!appInfo || !fromVersion || !toVersion) return
-
-      const flag = typeof decompileFlag === 'boolean' ? decompileFlag : decompile
-      const requestId = ++requestIdRef.current
-      setViewMode('diff')
-      setLoading(true)
-      setError(null)
-      setSelectedFile(null)
-
-      try {
-        const result = await getApi().ipm.getDiff(appInfo.name, fromVersion, toVersion, flag)
-        if (requestId !== requestIdRef.current) return
-        if (result.success && result.data) {
-          setDiffResult(result.data)
-        } else {
-          setError(result.error || 'Compare failed')
-        }
-      } catch (err) {
-        if (requestId !== requestIdRef.current) return
-        const message = err instanceof Error ? err.message : String(err)
-        setError(message)
-      } finally {
-        if (requestId === requestIdRef.current) setLoading(false)
-      }
-    },
-    [appInfo, fromVersion, toVersion, decompile]
-  )
-
-  const handleShow = useCallback(
-    async (version: string, decompileFlag?: boolean) => {
-      if (!appInfo) return
-      const flag = typeof decompileFlag === 'boolean' ? decompileFlag : decompile
-      const requestId = ++requestIdRef.current
-      setViewMode('show')
-      setLoading(true)
-      setError(null)
-      setSelectedFile(null)
-      try {
-        const result = await getApi().ipm.showVersion(appInfo.name, version, flag)
-        if (requestId !== requestIdRef.current) return
-        if (result.success && result.data) {
-          setDiffResult(result.data)
-        } else {
-          setError(result.error || 'Show failed')
-        }
-      } catch (err) {
-        if (requestId !== requestIdRef.current) return
-        const message = err instanceof Error ? err.message : String(err)
-        setError(message)
-      } finally {
-        if (requestId === requestIdRef.current) setLoading(false)
-      }
-    },
-    [appInfo, decompile]
-  )
-
-  const handleDecompileToggle = useCallback(() => {
-    const newDecompile = !decompile
-    setDecompile(newDecompile)
-    if (toVersion) handleShow(toVersion, newDecompile)
-  }, [decompile, toVersion, handleShow])
-
-  const handleOpenVscode = useCallback(async () => {
-    if (!appInfo || !diffResult || !toVersion) return
-    const files = diffResult.diffs.flatMap((d) => (d.newContent ? [{ path: d.filePath, content: d.newContent }] : []))
-    try {
-      const result = await getApi().editor.openInVscode({
-        appName: appInfo.name,
-        version: toVersion,
-        files
-      })
-      if (!result.success) {
-        showToast(result.error || 'Failed to open VS Code', 'error')
-      }
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
-    }
-  }, [appInfo, diffResult, toVersion])
-
-  const currentDiffs = useMemo(() => {
-    if (!diffResult) return []
-    return filterDiffs(diffResult.diffs, activeTab)
-  }, [diffResult, activeTab])
-
-  const summaries = useMemo(() => {
-    if (!diffResult) return { app: null, account: null, hook: null }
-    return {
-      app: countChanges(filterDiffs(diffResult.diffs, 'app')),
-      account: countChanges(filterDiffs(diffResult.diffs, 'account')),
-      hook: countChanges(filterDiffs(diffResult.diffs, 'hook'))
-    }
-  }, [diffResult])
+  const {
+    diffResult,
+    setDiffResult,
+    activeTab,
+    setActiveTab,
+    loading,
+    setLoading,
+    error,
+    setError,
+    selectedFile,
+    setSelectedFile,
+    viewMode,
+    setViewMode,
+    decompile,
+    setDecompile,
+    requestIdRef,
+    invalidateRequests,
+    currentDiffs,
+    summaries
+  } = useDiffState()
+  const { appInfo, fromVersion, toVersion, appIcon, handleFromChange, handleToChange, handleAppSelect, handleSwap } =
+    useAppSelection({ invalidateRequests, setDiffResult, setSelectedFile, setError, setDecompile })
+  const { handleCompare, handleShow, handleDecompileToggle, handleOpenVscode } = useDiffRequest({
+    appInfo,
+    fromVersion,
+    toVersion,
+    diffResult,
+    decompile,
+    requestIdRef,
+    setViewMode,
+    setLoading,
+    setError,
+    setSelectedFile,
+    setDiffResult,
+    setDecompile
+  })
 
   return (
     <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

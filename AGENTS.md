@@ -207,7 +207,7 @@ Three themes: `dark` (default, Catppuccin-inspired), `make` (Make.com purple), `
 
 `src/renderer/` has four layers and a few root files:
 
-- `app/`: `App.tsx`, the root component, with `EmptyState` and `AboutModal` (the parts that have no state of their own) and `hooks/`: `use-shell-ui` holds the dialog and sidebar state, `use-menu-events` the menu listeners, and `use-session` the theme load and the session checks
+- `app/`: `App.tsx`, the root component that calls the hooks and lays out the window, with `EmptyState` and `AboutModal` (the parts that have no state of their own) and `hooks/`: `use-shell-ui` holds the dialog and sidebar state, `use-menu-events` the menu listeners, `use-session` the theme load and the session checks, `use-app-selection` the selected app and its versions, and `use-diff-state` the diff, the tab, the loading and error state and the request counter that drops stale responses, and `use-diff-request` the Compare and Show requests
 - `features/<name>/`: one folder per feature (`sidebar`, `version-selector`, `diff`, `settings`, `download`) with its components, helpers and a `__tests__/` folder
 - `shared/`: `api/` (the only code that reads the preload bridge objects on `window`), `types/` (the only import point for preload and main types), `ui/` (`Toast`, `MakeLogo`) and `utils/`
 - `monaco/`: `monaco-setup.ts`, the IMLJSON tokenizer in `languages/` and the themes in `themes/`
@@ -229,7 +229,7 @@ Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature us
 - IPC input validation: `assertString`/`assertNumber` guards on key handlers (`get-app-info`, `recent:add`, `favorites:save`); `assertPathSegment` (`services/path-segment.ts`) on every handler that puts `appName`/`version` into a local path (`download-version`, `open-in-vscode`, `open-diff`, `copy-zip`), and in `IpmClient` for every name, version and type that goes into a request path
 - Exports: image files are held as `data:` URIs in `ExtractedFile.content`; `toFileData` turns them back into bytes when writing to disk or a ZIP
 - Requests: `get-diff`/`show-version`/`download-version` use one client and one dependency limiter (4 at a time) per request; the caches are cleared on settings save and session expiry
-- Renderer: a Show/Compare response is dropped if the app or version selection changed while it was pending; clickable list rows use `role`, `tabIndex` and `onActivateKey` for keyboard access (combobox options such as the DownloadModal results are reached through `aria-activedescendant` instead)
+- Renderer: a Show/Compare response is dropped if the app or version selection changed while it was pending (`requestIdRef` in `useDiffState`); clickable list rows use `role`, `tabIndex` and `onActivateKey` for keyboard access (combobox options such as the DownloadModal results are reached through `aria-activedescendant` instead)
 - Favorites/recents: legacy entries without `major` field filtered out on load
 - Connection test: catches 403 specifically for invalid token
 - Dependency downloads: silently skipped on failure (empty catch)
@@ -309,7 +309,7 @@ Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature us
 - Main process changes (services, IPC handlers) require app restart — renderer hot reloads
 - Compiled custom app functions.js exports strings, not function objects
 - Some apps use `communication` array pattern (e.g. Google Drive) — base fields are inside each step
-- `filterDiffs` in `app/App.tsx` must handle both compiled (`accounts/`, `hooks/`) and SDK (`connections/`, `webhooks/`) folder prefixes
+- `filterDiffs` in `features/diff/filter-diffs.ts` must handle both compiled (`accounts/`, `hooks/`) and SDK (`connections/`, `webhooks/`) folder prefixes
 - Electron `editMenu` role required for Cmd+A/C/V/X to work in renderer
 - Platform-conditional window config: `titleBarStyle`/`trafficLightPosition` only on macOS
 - Menu items `download-app`, `open-settings`, `about` disabled until settings are validated via `enableMenuItems()`

@@ -72,7 +72,7 @@ All IPC handlers return `IpcResult<T>`:
 - `src/main/index.ts` — Window creation, menu setup
 - `src/main/ipc-handlers.ts` — All IPC channel registration
 - `src/preload/index.ts` — Exposes `window.api`, `window.appVersion`, `window.onMenu`
-- `src/renderer/app/App.tsx` — Root component, state management
+- `src/renderer/app/App.tsx` — Root component, wires the hooks in `src/renderer/app/hooks/` (state and requests)
 - `src/renderer/__tests__/setup.ts` and `mocks/` — jsdom test setup: typed `window.api` fake and Monaco fakes
 - `src/renderer/monaco/monaco-setup.ts` — Monaco worker config, loader, language/theme registration
 - `src/renderer/monaco/languages/imljson.ts` — IMLJSON Monarch tokenizer (JSON + IML `{{expressions}}`)
