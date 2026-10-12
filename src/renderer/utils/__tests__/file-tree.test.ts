@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildTree, getFolderStatus, collectStatuses, countFiles, buildFlatList } from '../file-tree'
-import type { FileDiff } from '../../../preload/index'
+import type { FileDiff } from '../../shared/types'
 
 function makeDiff(filePath: string, status: FileDiff['status']): FileDiff {
   return { filePath, status, oldContent: '', newContent: '', unifiedDiff: '' }

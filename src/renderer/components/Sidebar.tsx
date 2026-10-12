@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import type { AppInfo, SearchApp, SearchEntry, FavoriteApp, RecentApp } from '../../preload/index'
+import type { AppInfo, SearchApp, SearchEntry, FavoriteApp, RecentApp } from '../shared/types'
 import { getMajor } from '../utils/version'
 import { buildSearchEntries, entryLabel, moveHighlight } from '../utils/app-search'
 import { onActivateKey } from '../utils/keyboard'
+import { getApi } from '../shared/api/electron-api'
 
 const MAX_RESULTS = 50
 
@@ -47,14 +48,14 @@ export default function Sidebar({
   }, [])
 
   useEffect(() => {
-    window.api.favorites
-      .load()
+    getApi()
+      .favorites.load()
       .then((r) => {
         if (r.success && r.data) setFavorites(r.data)
       })
       .catch((err: unknown) => console.error('Failed to load favorites', err))
-    window.api.recent
-      .load()
+    getApi()
+      .recent.load()
       .then((r) => {
         if (r.success && r.data) setRecentApps(r.data)
       })
@@ -65,8 +66,8 @@ export default function Sidebar({
     let cancelled = false
     setLoadingApps(true)
     setError(null)
-    window.api.ipm
-      .searchApps()
+    getApi()
+      .ipm.searchApps()
       .then((result) => {
         if (cancelled) return
         if (result.success && result.data) {
@@ -103,7 +104,7 @@ export default function Sidebar({
     setSearchQuery('')
     setError(null)
     try {
-      const result = await window.api.ipm.getAppInfo(entry.app.name, entry.versions[0])
+      const result = await getApi().ipm.getAppInfo(entry.app.name, entry.versions[0])
       if (result.success && result.data) {
         const apiVersions = result.data.versions.filter((v) => getMajor(v) === entry.major)
         const info = {
@@ -114,8 +115,8 @@ export default function Sidebar({
         setSelectedApp(info)
         setSelectedMajor(entry.major)
         onAppSelect(info)
-        window.api.recent
-          .add(entry.app.name, info.label || entry.app.name, entry.major)
+        getApi()
+          .recent.add(entry.app.name, info.label || entry.app.name, entry.major)
           .then((r) => {
             if (r.success && r.data) setRecentApps(r.data)
           })
@@ -133,7 +134,7 @@ export default function Sidebar({
     try {
       const versions = getVersionsForMajor(name, major)
       const latestVersion = versions.length > 0 ? versions[0] : undefined
-      const result = await window.api.ipm.getAppInfo(name, latestVersion)
+      const result = await getApi().ipm.getAppInfo(name, latestVersion)
       if (result.success && result.data) {
         const apiVersions = result.data.versions.filter((v) => getMajor(v) === major)
         const info = {
@@ -144,8 +145,8 @@ export default function Sidebar({
         setSelectedApp(info)
         setSelectedMajor(major)
         onAppSelect(info)
-        window.api.recent
-          .add(name, info.label || label, major)
+        getApi()
+          .recent.add(name, info.label || label, major)
           .then((r) => {
             if (r.success && r.data) setRecentApps(r.data)
           })
@@ -164,7 +165,9 @@ export default function Sidebar({
       ? favorites.filter((f) => !(f.name === name && f.major === major))
       : [...favorites, { name, label, major, addedAt: Date.now() }]
     setFavorites(updated)
-    window.api.favorites.save(updated).catch((err: unknown) => console.error('Failed to save favorites', err))
+    getApi()
+      .favorites.save(updated)
+      .catch((err: unknown) => console.error('Failed to save favorites', err))
   }
 
   const isFavorite = (name: string, major: number | null) => favorites.some((f) => f.name === name && f.major === major)

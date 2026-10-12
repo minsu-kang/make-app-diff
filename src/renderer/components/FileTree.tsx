@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import type { FileDiff } from '../../preload/index'
+import type { FileDiff } from '../shared/types'
 import { buildTree, buildFlatList } from '../utils/file-tree'
 import { onActivateKey } from '../utils/keyboard'
 

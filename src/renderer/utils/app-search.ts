@@ -1,4 +1,4 @@
-import type { SearchApp, SearchEntry } from '../../preload/index'
+import type { SearchApp, SearchEntry } from '../shared/types'
 import { getMajor } from './version'
 
 function groupByMajor(versions: string[]): Map<number, string[]> {

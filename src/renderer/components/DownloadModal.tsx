@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useId, useCallback } from 'react'
-import type { SearchApp, SearchEntry } from '../../preload/index'
+import type { SearchApp, SearchEntry } from '../shared/types'
 import { buildSearchEntries, entryLabel, getSearchInputValue, moveHighlight } from '../utils/app-search'
+import { getApi } from '../shared/api/electron-api'
 
 const MAX_RESULTS = 30
 
@@ -45,8 +46,8 @@ export default function DownloadModal({ onClose }: Readonly<DownloadModalProps>)
 
   useEffect(() => {
     setLoadingApps(true)
-    window.api.ipm
-      .searchApps()
+    getApi()
+      .ipm.searchApps()
       .then((result) => {
         if (result.success && result.data) {
           setAllApps(result.data)
@@ -90,7 +91,7 @@ export default function DownloadModal({ onClose }: Readonly<DownloadModalProps>)
     setDownloading(true)
     setMessage(null)
     try {
-      const result = await window.api.ipm.downloadVersion(selectedEntry.app.name, selectedVersion)
+      const result = await getApi().ipm.downloadVersion(selectedEntry.app.name, selectedVersion)
       if (result.success) {
         setDownloadedPath(result.data ?? null)
       } else if (result.error !== 'Cancelled') {
@@ -120,7 +121,7 @@ export default function DownloadModal({ onClose }: Readonly<DownloadModalProps>)
             <p className="download-success-folder">{downloadedPath.split('/').pop()}</p>
             <p className="download-success-path">{downloadedPath.substring(0, downloadedPath.lastIndexOf('/'))}</p>
             <div className="download-success-actions">
-              <button className="btn-secondary" onClick={() => window.api.showInFinder(downloadedPath)}>
+              <button className="btn-secondary" onClick={() => getApi().showInFinder(downloadedPath)}>
                 Show in Finder
               </button>
               <button className="btn-primary" onClick={onClose}>

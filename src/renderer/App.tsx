@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import type { AppInfo, FileDiff, DiffResult } from '../preload/index'
+import type { AppInfo, FileDiff, DiffResult } from './shared/types'
 import Sidebar from './components/Sidebar'
 import Settings from './components/Settings'
 import DownloadModal from './components/DownloadModal'
@@ -8,6 +8,7 @@ import ComponentTabs from './components/ComponentTabs'
 import FileTree from './components/FileTree'
 import DiffViewer from './components/DiffViewer'
 import ToastContainer, { showToast } from './components/Toast'
+import { getApi, getAppVersion, getMenuEvents } from './shared/api/electron-api'
 
 type TabType = 'app' | 'account' | 'hook'
 
@@ -51,19 +52,19 @@ export default function App() {
   const requestIdRef = useRef(0)
 
   useEffect(() => {
-    const cleanupSettings = window.onMenu.openSettings(() => setShowSettings(true))
-    const cleanupDownload = window.onMenu.downloadApp(() => setShowDownloadModal(true))
-    const cleanupInfo = window.onMenu.showInfo(() => setShowInfo(true))
-    window.api.theme
-      .load()
+    const cleanupSettings = getMenuEvents().openSettings(() => setShowSettings(true))
+    const cleanupDownload = getMenuEvents().downloadApp(() => setShowDownloadModal(true))
+    const cleanupInfo = getMenuEvents().showInfo(() => setShowInfo(true))
+    getApi()
+      .theme.load()
       .then((theme) => {
         document.documentElement.dataset.theme = theme
       })
       .catch((error: unknown) => console.error('Failed to load the theme', error))
 
     // Check session expiry, then check if token exists
-    window.api.session
-      .check()
+    getApi()
+      .session.check()
       .then(({ expired }) => {
         if (expired) {
           showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
@@ -71,16 +72,18 @@ export default function App() {
           setShowSettings(true)
           return
         }
-        return window.api.settings.load().then((settings) => {
-          const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
-          if (!token?.trim()) {
-            setForcedSettings(true)
-            setShowSettings(true)
-          } else {
-            // Tokens exist and session is valid — enable menu items
-            window.api.menu.setEnabled(true)
-          }
-        })
+        return getApi()
+          .settings.load()
+          .then((settings) => {
+            const token = settings.host === 'ipme.integromat.com' ? settings.ipmeToken : settings.ipmToken
+            if (!token?.trim()) {
+              setForcedSettings(true)
+              setShowSettings(true)
+            } else {
+              // Tokens exist and session is valid — enable menu items
+              getApi().menu.setEnabled(true)
+            }
+          })
       })
       .catch((error: unknown) => {
         console.error('Failed to check the session', error)
@@ -91,10 +94,10 @@ export default function App() {
     const sessionInterval = setInterval(
       async () => {
         try {
-          const { expired } = await window.api.session.check()
+          const { expired } = await getApi().session.check()
           if (expired) {
             showToast('Session expired (48h inactive). Please re-enter your tokens.', 'error')
-            window.api.menu.setEnabled(false)
+            getApi().menu.setEnabled(false)
             setForcedSettings(true)
             setShowSettings(true)
           }
@@ -154,8 +157,8 @@ export default function App() {
       setDecompile(true)
 
       // Fetch app icon from /admin/icon/apps/{appName}
-      window.api.ipm
-        .getAppIcon(info.name)
+      getApi()
+        .ipm.getAppIcon(info.name)
         .then((result) => {
           if (result.success && result.data) {
             setAppIcon(result.data)
@@ -199,7 +202,7 @@ export default function App() {
       setSelectedFile(null)
 
       try {
-        const result = await window.api.ipm.getDiff(appInfo.name, fromVersion, toVersion, flag)
+        const result = await getApi().ipm.getDiff(appInfo.name, fromVersion, toVersion, flag)
         if (requestId !== requestIdRef.current) return
         if (result.success && result.data) {
           setDiffResult(result.data)
@@ -227,7 +230,7 @@ export default function App() {
       setError(null)
       setSelectedFile(null)
       try {
-        const result = await window.api.ipm.showVersion(appInfo.name, version, flag)
+        const result = await getApi().ipm.showVersion(appInfo.name, version, flag)
         if (requestId !== requestIdRef.current) return
         if (result.success && result.data) {
           setDiffResult(result.data)
@@ -255,7 +258,7 @@ export default function App() {
     if (!appInfo || !diffResult || !toVersion) return
     const files = diffResult.diffs.flatMap((d) => (d.newContent ? [{ path: d.filePath, content: d.newContent }] : []))
     try {
-      const result = await window.api.editor.openInVscode({
+      const result = await getApi().editor.openInVscode({
         appName: appInfo.name,
         version: toVersion,
         files
@@ -566,19 +569,19 @@ export default function App() {
               <p className="info-app-desc">App version diff viewer</p>
               <div className="info-row">
                 <span className="info-label">Version</span>
-                <span className="info-value">{window.appVersion?.app || '1.0.0'}</span>
+                <span className="info-value">{getAppVersion()?.app || '1.0.0'}</span>
               </div>
               <div className="info-row">
                 <span className="info-label">Electron</span>
-                <span className="info-value info-mono">{window.appVersion?.electron || '-'}</span>
+                <span className="info-value info-mono">{getAppVersion()?.electron || '-'}</span>
               </div>
               <div className="info-row">
                 <span className="info-label">Chrome</span>
-                <span className="info-value info-mono">{window.appVersion?.chrome || '-'}</span>
+                <span className="info-value info-mono">{getAppVersion()?.chrome || '-'}</span>
               </div>
               <div className="info-row">
                 <span className="info-label">Node</span>
-                <span className="info-value info-mono">{window.appVersion?.node || '-'}</span>
+                <span className="info-value info-mono">{getAppVersion()?.node || '-'}</span>
               </div>
               <p className="info-copyright">&copy; {new Date().getFullYear()} Minsu Kang</p>
             </div>

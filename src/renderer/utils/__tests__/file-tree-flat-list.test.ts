@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildTree, buildFlatList } from '../file-tree'
-import type { FileDiff } from '../../../preload/index'
+import type { FileDiff } from '../../shared/types'
 
 const LOGO_PATH = 'icon/logo.png'
 

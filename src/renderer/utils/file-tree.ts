@@ -1,4 +1,4 @@
-import type { FileDiff } from '../../preload/index'
+import type { FileDiff } from '../shared/types'
 
 export interface TreeNode {
   name: string

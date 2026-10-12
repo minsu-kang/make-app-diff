@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import Sidebar from '../Sidebar'
 import { mockApi, ok, fail } from '../../__tests__/mocks/window-api'
-import type { AppInfo, FavoriteApp, IpcResult, RecentApp, SearchAppResult } from '../../../preload/index'
+import type { AppInfo, FavoriteApp, IpcResult, RecentApp, SearchAppResult } from '../../shared/types'
 
 const HINT = 'Type to search from 2 apps'
 const SEARCH_PLACEHOLDER = 'Search by label or name...'

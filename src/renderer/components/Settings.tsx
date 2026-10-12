@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import type { IpmSettings } from '../../preload/index'
+import type { IpmSettings } from '../shared/types'
 import { showToast } from './Toast'
 import TokenField from './TokenField'
+import { getApi } from '../shared/api/electron-api'
 
 interface SettingsProps {
   onClose: () => void
@@ -35,7 +36,7 @@ export default function Settings({ onClose, onSaved, forced }: Readonly<Settings
   const initialTheme = useRef<string>('')
 
   useEffect(() => {
-    Promise.all([window.api.settings.load(), window.api.theme.load()])
+    Promise.all([getApi().settings.load(), getApi().theme.load()])
       .then(([loadedSettings, loadedTheme]) => {
         setSettings(loadedSettings)
         setTheme(loadedTheme)
@@ -89,9 +90,9 @@ export default function Settings({ onClose, onSaved, forced }: Readonly<Settings
     setSaving(true)
     setError(null)
     try {
-      const result = await window.api.settings.save(settings)
+      const result = await getApi().settings.save(settings)
       if (result.success) {
-        await window.api.theme.save(theme)
+        await getApi().theme.save(theme)
         showToast('Settings saved', 'success')
         onSaved?.()
         onClose()

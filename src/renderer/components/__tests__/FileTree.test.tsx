@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, vi, type MockInstance } fr
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import FileTree from '../FileTree'
-import type { FileDiff } from '../../../preload/index'
+import type { FileDiff } from '../../shared/types'
 
 type Props = Partial<Parameters<typeof FileTree>[0]>
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import DiffViewer from '../DiffViewer'
-import type { FileDiff } from '../../../preload/index'
+import type { FileDiff } from '../../shared/types'
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo='
 const GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='

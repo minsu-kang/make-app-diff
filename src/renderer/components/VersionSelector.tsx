@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import type { VersionTags } from '../../preload/index'
+import type { VersionTags } from '../shared/types'
 import { showToast } from './Toast'
 import VersionTimeline from './VersionTimeline'
+import { getApi } from '../shared/api/electron-api'
 
 interface VersionSelectorProps {
   versions: string[]
@@ -82,7 +83,7 @@ export default function VersionSelector({
     if (!downloadVersion || !appName) return
     setDownloading(true)
     try {
-      const result = await window.api.ipm.downloadVersion(appName, downloadVersion)
+      const result = await getApi().ipm.downloadVersion(appName, downloadVersion)
       if (result.success) {
         setDownloadedPath(result.data ?? null)
       } else if (result.error !== 'Cancelled') {
@@ -100,7 +101,7 @@ export default function VersionSelector({
     setCopyingZip(true)
     try {
       // Download and extract version files
-      const result = await window.api.ipm.showVersion(appName, downloadVersion)
+      const result = await getApi().ipm.showVersion(appName, downloadVersion)
       if (!result.success || !result.data) {
         showToast(`Failed: ${result.error}`, 'error')
         return
@@ -109,7 +110,7 @@ export default function VersionSelector({
         path: d.filePath,
         content: d.newContent || d.oldContent
       }))
-      const zipResult = await window.api.clipboard.copyZip({
+      const zipResult = await getApi().clipboard.copyZip({
         appName,
         version: downloadVersion,
         files
@@ -260,7 +261,7 @@ export default function VersionSelector({
               <p className="download-success-folder">{downloadedPath.split('/').pop()}</p>
               <p className="download-success-path">{downloadedPath.substring(0, downloadedPath.lastIndexOf('/'))}</p>
               <div className="download-success-actions">
-                <button className="btn-secondary" onClick={() => window.api.showInFinder(downloadedPath)}>
+                <button className="btn-secondary" onClick={() => getApi().showInFinder(downloadedPath)}>
                   Show in Finder
                 </button>
                 <button className="btn-primary" onClick={() => setDownloadedPath(null)}>

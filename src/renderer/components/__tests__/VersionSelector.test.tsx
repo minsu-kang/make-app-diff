@@ -4,7 +4,7 @@ import userEvent, { type UserEvent } from '@testing-library/user-event'
 import VersionSelector from '../VersionSelector'
 import ToastContainer from '../Toast'
 import { mockApi, ok, fail, type ApiMock } from '../../__tests__/mocks/window-api'
-import type { DiffResult, IpcResult, VersionTags } from '../../../preload/index'
+import type { DiffResult, IpcResult, VersionTags } from '../../shared/types'
 
 type Props = Parameters<typeof VersionSelector>[0]
 

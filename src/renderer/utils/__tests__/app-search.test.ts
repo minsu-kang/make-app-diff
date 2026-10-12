@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildSearchEntries, entryLabel, getSearchInputValue, moveHighlight } from '../app-search'
-import type { SearchApp, SearchEntry } from '../../../preload/index'
+import type { SearchApp, SearchEntry } from '../../shared/types'
 
 function makeApp(name: string, label: string, version: string, availableVersions: string[]): SearchApp {
   return { name, label, version, availableVersions }

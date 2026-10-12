@@ -1,5 +1,5 @@
 import { vi, type Mock } from 'vitest'
-import type { ElectronApi, IpcResult } from '../../../preload/index'
+import type { ElectronApi, IpcResult } from '../../shared/types'
 
 export type Mocked<T> = {
   [K in keyof T]: T[K] extends (...args: infer A) => infer R ? Mock<(...args: A) => R> : Mocked<T[K]>

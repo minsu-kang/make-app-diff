@@ -12,7 +12,7 @@ export default defineConfig({
           include: [
             'src/main/__tests__/**/*.test.ts',
             'src/main/services/__tests__/**/*.test.ts',
-            'src/renderer/utils/__tests__/**/*.test.ts'
+            'src/renderer/**/__tests__/**/*.test.ts'
           ]
         }
       },
@@ -34,13 +34,10 @@ export default defineConfig({
         'src/main/services/**/*.ts',
         'src/renderer/utils/**/*.ts',
         'src/renderer/components/**/*.tsx',
+        'src/renderer/shared/**/*.{ts,tsx}',
         'src/renderer/App.tsx'
       ],
-      exclude: [
-        'src/main/services/__tests__/**',
-        'src/renderer/utils/__tests__/**',
-        'src/renderer/components/__tests__/**'
-      ],
+      exclude: ['src/main/services/__tests__/**', 'src/renderer/**/__tests__/**', 'src/renderer/shared/types/**'],
       thresholds: {
         statements: 85,
         branches: 75,

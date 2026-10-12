@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import Settings from '../Settings'
 import ToastContainer from '../Toast'
 import { mockApi, type ApiMock } from '../../__tests__/mocks/window-api'
-import type { IpmSettings } from '../../../preload/index'
+import type { IpmSettings } from '../../shared/types'
 
 type User = ReturnType<typeof userEvent.setup>
 

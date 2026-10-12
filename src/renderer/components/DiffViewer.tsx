@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { DiffEditor, Editor } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
-import type { FileDiff } from '../../preload/index'
+import type { FileDiff } from '../shared/types'
 import { showToast } from './Toast'
 import { isValidDataUri } from '../utils/diff-viewer'
 import { getMonacoTheme, getLanguageForFile } from '../monaco-setup'
+import { getApi } from '../shared/api/electron-api'
 
 interface DiffViewerProps {
   diffs: FileDiff[]
@@ -125,7 +126,7 @@ export default function DiffViewer({
   const handleOpenInVSCode = useCallback(async () => {
     if (!visibleDiff || !fromVersion || !toVersion) return
     try {
-      const result = await window.api.editor.openDiff({
+      const result = await getApi().editor.openDiff({
         filePath: visibleDiff.filePath,
         fromVersion,
         toVersion,

@@ -18,13 +18,13 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 
 - **Main process**: Business logic only (API calls, file I/O, storage)
 - **Preload**: Minimal bridge — expose IPC via `contextBridge`, nothing else
-- **Renderer**: UI only — never access Node.js APIs directly
+- **Renderer**: UI only — never access Node.js APIs directly. It reaches the bridge only through `src/renderer/shared/api` (`getApi()`, `getMenuEvents()`, `getAppVersion()`, each reads `window` at call time) and takes types only from `src/renderer/shared/types`. ESLint enforces both, and, once the `app/`, `features/` and `monaco/` folders exist, keeps `shared/` and `monaco/` from importing the layers above them and a feature from importing another feature
 
 ### Adding a new IPC channel
 
 1. Add handler in `src/main/ipc-handlers.ts`
 2. Expose in `src/preload/index.ts` via `window.api`
-3. Call from renderer via `window.api.*`
+3. Call from renderer via `getApi().*` (`shared/api`)
 4. Return `{ success, data?, error? }` pattern
 
 ### Adding a new menu item
@@ -85,6 +85,8 @@ Electron desktop app for viewing diffs between Make.com app versions. Downloads 
 - `window.api` — IPC interface (`settings`, `theme`, `ipm`, `favorites`, `recent`, `editor`, `clipboard`, `showInFinder` namespaces)
 - `window.appVersion` — `{ app, electron, chrome, node }`
 - `window.onMenu` — `{ downloadApp, openSettings, showInfo }` callback registration (each returns cleanup function)
+
+The renderer never reads these three objects from `window` directly. `src/renderer/shared/api/electron-api.ts` exposes them as `getApi()`, `getMenuEvents()` and `getAppVersion()`; tests keep installing the fakes on `window` (`__tests__/mocks/window-api.ts`), and the getters read `window` on every call, so they see the fake of the current test. Do not call a getter at module scope or store its result in a module-level constant (ESLint rejects a direct call there)
 
 ## Data Flow Patterns
 
@@ -147,7 +149,7 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 
 ## Type System
 
-**Key types (`src/main/types.ts`):** All shared types are defined here and re-exported via `src/preload/index.ts`.
+**Key types (`src/main/types.ts`):** All shared types are defined here and re-exported via `src/preload/index.ts`. The renderer imports them from `src/renderer/shared/types` (`export type *` of the preload exports), never from `preload` or `main`.
 - `IpcResult<T>` — `{ success, data?, error? }` — standard IPC response wrapper
 - `IpmSettings` — host, ipmToken, ipmeToken, env, ipmVersion
 - `AppInfo` — name, label, description, version, versions, theme?, iconHash?, meta?
@@ -325,9 +327,9 @@ useIpcCall<T, A>(fn) → { data, loading, error, execute, setData }
 
 ## Testing
 
-- `npm run test` and `npm run test:coverage` run the unit tests in two vitest projects: `node` (`src/main/__tests__/**`, `src/main/services/__tests__/**` and `src/renderer/utils/__tests__/**`, minus `*.integration.test.ts`) and `renderer` (`src/renderer/**/__tests__/*.test.tsx`, jsdom, React Testing Library). One coverage report with one set of thresholds covers `src/main/services`, `src/renderer/utils`, `src/renderer/components` and `App.tsx`
+- `npm run test` and `npm run test:coverage` run the unit tests in two vitest projects: `node` (`src/main/__tests__/**`, `src/main/services/__tests__/**` and `src/renderer/**/__tests__/**/*.test.ts`, minus `*.integration.test.ts`) and `renderer` (`src/renderer/**/__tests__/**/*.test.tsx`, jsdom, React Testing Library). One coverage report with one set of thresholds covers `src/main/services`, `src/renderer/utils`, `src/renderer/components`, `src/renderer/shared` and `App.tsx`
 - Renderer tests install fresh `window.api`, `window.onMenu` and `window.appVersion` mocks before every test (`src/renderer/__tests__/mocks/window-api.ts`, typed against the preload API, so a new IPC method breaks the typecheck until the factory has it). Read and override them with `mockApi()` and `mockMenu()`. `setup.ts` also mocks `@monaco-editor/react` and `monaco-editor` for every test, because jsdom cannot load the real editor, and stubs `scrollIntoView`. It also clears all mocks before and restores all spies after every test. `Toast` keeps one module-level handler, so a test renders one `ToastContainer` at a time
-- A renderer test file must import nothing that needs Chromium layout or workers; use the e2e tests for that. `esbuild.jsx` is `automatic` in the `renderer` project because only `tsconfig.web.json` sets `jsx`
+- A renderer test file must import nothing that needs Chromium layout or workers; use the e2e tests for that. A renderer `.test.ts` runs in the `node` project, so it can use neither `window` nor React; a test that needs either is a `.test.tsx` and runs in jsdom. `esbuild.jsx` is `automatic` in the `renderer` project because only `tsconfig.web.json` sets `jsx`
 - `npm run test:integration` runs `src/main/__tests__/integration/*.integration.test.ts` (separate vitest config, `integration` CI job). They register the real IPC handlers and run the real `IpmClient`, PKR extraction, decompiler, diff and storage code against a faked IPM server (`nock` with the network closed, PKR archives built with `packSync`)
 - Only Electron, `electron-store`, `child_process`, `os.tmpdir()` and the menu callbacks of `src/main/index.ts` are faked, in `integration/harness.ts` (plus `process.platform` and `Date` where a test sets them). A declared IPM request that no code made, or a request nobody declared, fails the test
 - New scenario: declare the IPM responses (`mockApp`, `ipm()`), call `invoke(channel, ...)`, assert on the result, the files written under the temp folder or the requests made

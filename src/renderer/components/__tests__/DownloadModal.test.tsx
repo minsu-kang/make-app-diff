@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import DownloadModal from '../DownloadModal'
 import { mockApi, ok, fail } from '../../__tests__/mocks/window-api'
-import type { IpcResult, SearchAppResult } from '../../../preload/index'
+import type { IpcResult, SearchAppResult } from '../../shared/types'
 
 const TITLE = 'Download App'
 const SEARCH_PLACEHOLDER = 'Search by label or name...'

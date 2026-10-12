@@ -6,7 +6,7 @@ import DiffViewer from '../DiffViewer'
 import ToastContainer from '../Toast'
 import { editorHandles } from '../../__tests__/mocks/monaco'
 import { mockApi, ok, type ApiMock } from '../../__tests__/mocks/window-api'
-import type { FileDiff } from '../../../preload/index'
+import type { FileDiff } from '../../shared/types'
 
 type Props = Parameters<typeof DiffViewer>[0]
 

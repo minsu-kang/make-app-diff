@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import App from '../App'
 import { fail, mockApi, mockMenu, ok } from './mocks/window-api'
-import type { AppInfo, DiffResult, FileDiff, IpcResult, IpmSettings, SearchAppResult } from '../../preload/index'
+import type { AppInfo, DiffResult, FileDiff, IpcResult, IpmSettings, SearchAppResult } from '../shared/types'
 
 const SEARCH_PLACEHOLDER = 'Search by label or name...'
 const CHANGED_FILES = 'Changed files (1)'

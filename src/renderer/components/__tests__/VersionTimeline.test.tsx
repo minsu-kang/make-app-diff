@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import VersionTimeline from '../VersionTimeline'
-import type { VersionTags } from '../../../preload/index'
+import type { VersionTags } from '../../shared/types'
 
 type Props = Parameters<typeof VersionTimeline>[0]
 type Layout = Record<string, readonly [left: number, width: number]>

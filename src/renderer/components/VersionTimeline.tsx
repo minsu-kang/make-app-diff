@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react'
-import type { VersionTags } from '../../preload/index'
+import type { VersionTags } from '../shared/types'
 import { compareSemver } from '../utils/version'
 
 interface VersionTimelineProps {
