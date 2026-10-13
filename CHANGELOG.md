@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.7.5](https://github.com/integromat/make-app-diff/compare/v1.7.4...v1.7.5) (2026-10-13)
+
+
+### Code Refactoring
+
+* extract EmptyState, AboutModal and MakeLogo from App ([#21](https://github.com/integromat/make-app-diff/issues/21)) ([0026ace](https://github.com/integromat/make-app-diff/commit/0026ace65ecc6c1a585330c7fceb63d705e9f8d8))
+* give the shared empty-state styles one owner ([#27](https://github.com/integromat/make-app-diff/issues/27)) ([4299df2](https://github.com/integromat/make-app-diff/commit/4299df268923510b16926ee84f4d60e3889d9fed))
+* move renderer files into app, features, shared and monaco ([#20](https://github.com/integromat/make-app-diff/issues/20)) ([822c796](https://github.com/integromat/make-app-diff/commit/822c7968f669b5ab389a3f1b81565f4457df7ed1))
+* move the App mount effects into shell hooks ([#22](https://github.com/integromat/make-app-diff/issues/22)) ([861261c](https://github.com/integromat/make-app-diff/commit/861261ccb096d8b1438eeceaf12185c17bcef645))
+* move the App selection and diff requests into hooks ([#23](https://github.com/integromat/make-app-diff/issues/23)) ([c060cb2](https://github.com/integromat/make-app-diff/commit/c060cb2e1221f4fca50b53936dd3b4c5ef1eee20))
+* move the Sidebar app list and favorites into hooks ([#25](https://github.com/integromat/make-app-diff/issues/25)) ([3110aed](https://github.com/integromat/make-app-diff/commit/3110aedac71941e872f864322a39977abe48df9e))
+* reach the preload bridge and types through shared modules ([#19](https://github.com/integromat/make-app-diff/issues/19)) ([88dc956](https://github.com/integromat/make-app-diff/commit/88dc9566cee50fcf6ef05630072d7e441df1cb90))
+* remove the unused CSS rules ([#26](https://github.com/integromat/make-app-diff/issues/26)) ([10f989b](https://github.com/integromat/make-app-diff/commit/10f989bd4297454c3268dfe96beb0c8ad0db440c))
+* split global.css into per-component files ([#24](https://github.com/integromat/make-app-diff/issues/24)) ([5c29817](https://github.com/integromat/make-app-diff/commit/5c29817b7bb9d5f8a5821a72916320ca358bacc8))
+
+
+### Tests
+
+* pin the App behaviors that the hook split must keep ([#17](https://github.com/integromat/make-app-diff/issues/17)) ([5264e5d](https://github.com/integromat/make-app-diff/commit/5264e5d7ab9ae28fb7ce0d51d69c9b0a0b9aaa34))
+
 ## [1.7.4](https://github.com/integromat/make-app-diff/compare/v1.7.3...v1.7.4) (2026-10-09)
 
 
