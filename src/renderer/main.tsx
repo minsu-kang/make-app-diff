@@ -9,6 +9,8 @@ import './shared/ui/search-results.css'
 import './shared/ui/download-success.css'
 import './shared/ui/error-message.css'
 import './shared/ui/section-chevron.css'
+import './shared/ui/empty-state.css'
+import './shared/ui/diff-viewer-empty.css'
 import App from './app/App'
 
 const rootElement = document.getElementById('root')

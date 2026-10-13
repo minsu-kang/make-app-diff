@@ -217,8 +217,6 @@ Three themes: `dark` (default, Catppuccin-inspired), `make` (Make.com purple), `
 
 Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature uses `shared` and `monaco`; `monaco` uses `shared`; `shared` imports nothing from the other layers; a feature imports no other feature, so code that two features need moves to `shared/`. ESLint enforces this for static imports (`eslint.config.mjs`). The per-feature rules are generated from the folders in `features/`, so a new feature folder is covered without a config change. A test sits in the `__tests__/` folder next to the code it covers.
 
-`App` renders two blocks that are styled by the CSS of other components: `diff-viewer-empty` in `features/diff/DiffViewer.css`, and `empty-state` with `hint` in `app/EmptyState.css`. Leave them where they are until they get one owner.
-
 ## Electron Window Config
 
 - Size: 1400x900 (min 1000x700)
