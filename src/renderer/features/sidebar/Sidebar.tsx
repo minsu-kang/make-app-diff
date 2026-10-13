@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import type { AppInfo, SearchApp, SearchEntry, FavoriteApp, RecentApp } from '../../shared/types'
+import type { AppInfo, SearchEntry } from '../../shared/types'
 import { getMajor } from '../../shared/utils/version'
 import { buildSearchEntries, entryLabel, moveHighlight } from '../../shared/utils/app-search'
 import { onActivateKey } from '../../shared/utils/keyboard'
 import { getApi } from '../../shared/api/electron-api'
+import { useAppList } from './use-app-list'
+import { useFavoritesRecents } from './use-favorites-recents'
 import './Sidebar.css'
 
 const MAX_RESULTS = 50
@@ -24,14 +26,9 @@ export default function Sidebar({
   refreshKey
 }: Readonly<SidebarProps>) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [allApps, setAllApps] = useState<SearchApp[]>([])
-  const [loadingApps, setLoadingApps] = useState(false)
   const [selectedApp, setSelectedApp] = useState<AppInfo | null>(null)
   const [selectedMajor, setSelectedMajor] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
-  const [favorites, setFavorites] = useState<FavoriteApp[]>([])
-  const [recentApps, setRecentApps] = useState<RecentApp[]>([])
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
   const [recentsCollapsed, setRecentsCollapsed] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -48,45 +45,8 @@ export default function Sidebar({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  useEffect(() => {
-    getApi()
-      .favorites.load()
-      .then((r) => {
-        if (r.success && r.data) setFavorites(r.data)
-      })
-      .catch((err: unknown) => console.error('Failed to load favorites', err))
-    getApi()
-      .recent.load()
-      .then((r) => {
-        if (r.success && r.data) setRecentApps(r.data)
-      })
-      .catch((err: unknown) => console.error('Failed to load recent apps', err))
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    setLoadingApps(true)
-    setError(null)
-    getApi()
-      .ipm.searchApps()
-      .then((result) => {
-        if (cancelled) return
-        if (result.success && result.data) {
-          setAllApps(result.data)
-        } else {
-          setError(result.error || 'Failed to load apps')
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingApps(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [refreshKey])
+  const { favorites, recentApps, addRecent, toggleFavorite, isFavorite } = useFavoritesRecents()
+  const { allApps, loadingApps, error, setError } = useAppList(refreshKey)
 
   const filteredEntries = useMemo(() => buildSearchEntries(allApps, searchQuery, MAX_RESULTS), [searchQuery, allApps])
 
@@ -116,12 +76,7 @@ export default function Sidebar({
         setSelectedApp(info)
         setSelectedMajor(entry.major)
         onAppSelect(info)
-        getApi()
-          .recent.add(entry.app.name, info.label || entry.app.name, entry.major)
-          .then((r) => {
-            if (r.success && r.data) setRecentApps(r.data)
-          })
-          .catch((err: unknown) => console.error('Failed to update recent apps', err))
+        addRecent(entry.app.name, info.label || entry.app.name, entry.major)
       } else {
         setError(result.error || 'Failed to load app info')
       }
@@ -146,12 +101,7 @@ export default function Sidebar({
         setSelectedApp(info)
         setSelectedMajor(major)
         onAppSelect(info)
-        getApi()
-          .recent.add(name, info.label || label, major)
-          .then((r) => {
-            if (r.success && r.data) setRecentApps(r.data)
-          })
-          .catch((err: unknown) => console.error('Failed to update recent apps', err))
+        addRecent(name, info.label || label, major)
       } else {
         setError(result.error || 'Failed to load app info')
       }
@@ -159,19 +109,6 @@ export default function Sidebar({
       setError(err instanceof Error ? err.message : String(err))
     }
   }
-
-  const toggleFavorite = (name: string, label: string, major: number) => {
-    const exists = favorites.some((f) => f.name === name && f.major === major)
-    const updated = exists
-      ? favorites.filter((f) => !(f.name === name && f.major === major))
-      : [...favorites, { name, label, major, addedAt: Date.now() }]
-    setFavorites(updated)
-    getApi()
-      .favorites.save(updated)
-      .catch((err: unknown) => console.error('Failed to save favorites', err))
-  }
-
-  const isFavorite = (name: string, major: number | null) => favorites.some((f) => f.name === name && f.major === major)
 
   return (
     <div className="sidebar">

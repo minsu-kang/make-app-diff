@@ -265,6 +265,7 @@ Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature us
 - Search input with Cmd+K focus shortcut
 - Favorites (star toggle) and Recents sections (collapsible)
 - Version grouping by major version number
+- `use-app-list.ts` loads the app list (and reloads it when `refreshKey` changes, dropping a stale answer) and owns the error that the select handlers also set; `use-favorites-recents.ts` loads and saves the favorites and the recent apps
 
 ### VersionSelector (`features/version-selector/VersionSelector.tsx`)
 - From/To dropdowns with swap button, Compare button (Cmd+Enter)
