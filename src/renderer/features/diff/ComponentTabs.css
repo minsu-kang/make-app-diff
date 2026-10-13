@@ -31,17 +31,6 @@
   border-bottom-color: var(--accent);
 }
 
-.tab-badge {
-  background: var(--accent);
-  color: var(--bg-primary);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
-}
-
 .btn-decompile-toggle {
   margin-left: auto;
   display: flex;
