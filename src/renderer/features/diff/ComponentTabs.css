@@ -1,0 +1,110 @@
+.component-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 20px;
+  background: var(--bg-secondary);
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-badge {
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.btn-decompile-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  align-self: center;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.btn-decompile-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.btn-decompile-toggle.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-decompile-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.tab-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-badge-add,
+.tab-badge-del,
+.tab-badge-mod {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  line-height: 14px;
+}
+
+.tab-badge-add {
+  background: rgba(166, 227, 161, 0.15);
+  color: var(--green);
+}
+
+.tab-badge-del {
+  background: rgba(243, 139, 168, 0.15);
+  color: var(--red);
+}
+
+.tab-badge-mod {
+  background: rgba(249, 226, 175, 0.15);
+  color: var(--yellow);
+}

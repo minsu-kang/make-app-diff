@@ -4,6 +4,7 @@ import { getMajor } from '../../shared/utils/version'
 import { buildSearchEntries, entryLabel, moveHighlight } from '../../shared/utils/app-search'
 import { onActivateKey } from '../../shared/utils/keyboard'
 import { getApi } from '../../shared/api/electron-api'
+import './Sidebar.css'
 
 const MAX_RESULTS = 50
 

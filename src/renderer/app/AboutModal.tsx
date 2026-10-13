@@ -1,5 +1,6 @@
 import MakeLogo from '../shared/ui/MakeLogo'
 import { getAppVersion } from '../shared/api/electron-api'
+import './AboutModal.css'
 
 interface AboutModalProps {
   onClose: () => void

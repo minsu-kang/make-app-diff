@@ -175,7 +175,7 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - Keep types in `src/main/types.ts` for shared types
 - Component-local interfaces are OK for props
 - CSS variables for all colors — never hardcode colors in components
-- All themes defined in `:root` / `:root[data-theme='...']` in `global.css`
+- All themes defined in `:root` / `:root[data-theme='...']` in `styles/tokens.css`
 
 ## CSS Conventions
 
@@ -189,7 +189,9 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 - `.empty-state-*` for landing page
 
 **Rules:**
-- Global CSS only (no CSS modules)
+- A component that has styles keeps a plain CSS file next to it and imports it as the last of its imports; there are no CSS modules, so class names are global
+- Classes that several components use live in `shared/ui/*.css` (all but `Toast.css`, which belongs to `Toast`), the theme variables in `styles/tokens.css` and the reset in `styles/base.css`; `main.tsx` imports those in a fixed order before `App`
+- The cascade follows the import order, so a rule that has to win over a rule in another file needs a more specific selector, not a later import
 - All colors via CSS custom properties
 - macOS + Windows desktop — no responsive/media queries
 - `-webkit-app-region: drag` on header/drag areas
@@ -199,7 +201,7 @@ Transforms compiled custom apps (lib/app.js + manifest.json) into SDK structure:
 
 Three themes: `dark` (default, Catppuccin-inspired), `make` (Make.com purple), `light` (Apple-inspired)
 - Theme stored via electron-store, applied as `data-theme` attribute on `<html>`
-- CSS variables in `global.css` for layout/UI colors
+- CSS variables in `styles/tokens.css` for layout/UI colors
 - Monaco editor themes defined in `monaco/themes/monaco-themes.ts` (`makediff-dark`, `makediff-make`, `makediff-light`)
 - DiffViewer observes `data-theme` changes and calls `getMonacoTheme()` to sync
 
@@ -209,11 +211,13 @@ Three themes: `dark` (default, Catppuccin-inspired), `make` (Make.com purple), `
 
 - `app/`: `App.tsx`, the root component that calls the hooks and lays out the window, with `EmptyState` and `AboutModal` (the parts that have no state of their own) and `hooks/`: `use-shell-ui` holds the dialog and sidebar state, `use-menu-events` the menu listeners, `use-session` the theme load and the session checks, `use-app-selection` the selected app and its versions, and `use-diff-state` the diff, the tab, the loading and error state and the request counter that drops stale responses, and `use-diff-request` the Compare and Show requests
 - `features/<name>/`: one folder per feature (`sidebar`, `version-selector`, `diff`, `settings`, `download`) with its components, helpers and a `__tests__/` folder
-- `shared/`: `api/` (the only code that reads the preload bridge objects on `window`), `types/` (the only import point for preload and main types), `ui/` (`Toast`, `MakeLogo`) and `utils/`
+- `shared/`: `api/` (the only code that reads the preload bridge objects on `window`), `types/` (the only import point for preload and main types), `ui/` (`Toast`, `MakeLogo` and the CSS that several components share) and `utils/`
 - `monaco/`: `monaco-setup.ts`, the IMLJSON tokenizer in `languages/` and the themes in `themes/`
-- Root: `main.tsx`, `index.html`, `env.d.ts`, `styles/global.css`, and `__tests__/` with the test setup and the `window` fakes
+- Root: `main.tsx`, `index.html`, `env.d.ts`, `styles/` (`tokens.css`, `base.css`), and `__tests__/` with the test setup and the `window` fakes
 
 Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature uses `shared` and `monaco`; `monaco` uses `shared`; `shared` imports nothing from the other layers; a feature imports no other feature, so code that two features need moves to `shared/`. ESLint enforces this for static imports (`eslint.config.mjs`). The per-feature rules are generated from the folders in `features/`, so a new feature folder is covered without a config change. A test sits in the `__tests__/` folder next to the code it covers.
+
+`App` renders two blocks that are styled by the CSS of other components: `diff-viewer-empty` in `features/diff/DiffViewer.css`, and `empty-state` with `hint` in `app/EmptyState.css`. Leave them where they are until they get one owner.
 
 ## Electron Window Config
 

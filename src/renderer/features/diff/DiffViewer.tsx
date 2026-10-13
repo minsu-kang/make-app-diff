@@ -6,6 +6,7 @@ import { showToast } from '../../shared/ui/Toast'
 import { isValidDataUri } from './diff-viewer'
 import { getMonacoTheme, getLanguageForFile } from '../../monaco/monaco-setup'
 import { getApi } from '../../shared/api/electron-api'
+import './DiffViewer.css'
 
 interface DiffViewerProps {
   diffs: FileDiff[]

@@ -1,0 +1,92 @@
+.version-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.version-dropdowns {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.version-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.version-label span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.version-label select {
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 140px;
+  outline: none;
+  cursor: pointer;
+}
+
+.version-label select:focus {
+  border-color: var(--accent);
+}
+
+.btn-swap {
+  font-size: 18px;
+  padding-bottom: 6px;
+  color: var(--text-muted);
+  transition:
+    color 0.15s,
+    transform 0.15s;
+}
+
+.btn-swap:hover:not(:disabled) {
+  color: var(--accent);
+  transform: scaleX(-1);
+}
+
+.btn-swap:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.btn-download-toggle {
+  font-size: 18px;
+  padding-bottom: 6px;
+  margin-left: 4px;
+}
+
+.btn-download-toggle.active {
+  color: var(--accent);
+}
+
+.download-row {
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.btn-compare,
+.btn-download {
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+.btn-timeline-toggle {
+  padding-bottom: 6px;
+  margin-left: 0;
+}
+
+.btn-timeline-toggle.active {
+  color: var(--accent);
+}

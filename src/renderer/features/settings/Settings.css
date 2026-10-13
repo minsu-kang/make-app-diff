@@ -1,0 +1,123 @@
+.settings-forced-message {
+  margin: 0 20px;
+  padding: 10px 14px;
+  background: rgba(248, 81, 73, 0.08);
+  border-left: 3px solid var(--red);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-section + .settings-section {
+  margin-top: 4px;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 0 6px;
+  transition: color 0.15s;
+}
+
+.settings-section-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.theme-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.theme-card:hover {
+  background: var(--bg-hover);
+}
+
+.theme-card.active {
+  border-color: var(--accent);
+}
+
+.theme-card-preview {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  height: 24px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.theme-card-bg {
+  flex: 3;
+  border-radius: 3px 0 0 3px;
+}
+
+.theme-card-accent {
+  flex: 1;
+  border-radius: 0 3px 3px 0;
+}
+
+.theme-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.theme-card.active .theme-card-label {
+  color: var(--accent);
+}
+
+.settings-discard-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(249, 226, 175, 0.08);
+  border: 1px solid rgba(249, 226, 175, 0.3);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--yellow);
+}
+
+.settings-discard-actions {
+  display: flex;
+  gap: 8px;
+}

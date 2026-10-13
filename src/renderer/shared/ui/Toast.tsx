@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import './Toast.css'
 
 export interface ToastMessage {
   id: number

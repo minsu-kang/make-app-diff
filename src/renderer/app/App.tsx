@@ -14,6 +14,7 @@ import { useSession } from './hooks/use-session'
 import { useDiffState } from './hooks/use-diff-state'
 import { useDiffRequest } from './hooks/use-diff-request'
 import { useAppSelection } from './hooks/use-app-selection'
+import './App.css'
 
 export default function App() {
   const {

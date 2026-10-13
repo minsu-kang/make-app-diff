@@ -3,6 +3,7 @@ import type { IpmSettings } from '../../shared/types'
 import { showToast } from '../../shared/ui/Toast'
 import TokenField from './TokenField'
 import { getApi } from '../../shared/api/electron-api'
+import './Settings.css'
 
 interface SettingsProps {
   onClose: () => void

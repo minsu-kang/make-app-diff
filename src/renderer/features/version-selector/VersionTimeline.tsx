@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react'
 import type { VersionTags } from '../../shared/types'
 import { compareSemver } from '../../shared/utils/version'
+import './VersionTimeline.css'
 
 interface VersionTimelineProps {
   versions: string[]

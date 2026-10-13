@@ -1,0 +1,153 @@
+.diff-viewer {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  user-select: text;
+  -webkit-user-select: text;
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-container {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.media-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.media-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: repeating-conic-gradient(var(--bg-surface) 0% 25%, var(--bg-hover) 0% 50%) 50% / 16px 16px;
+}
+
+.media-diff {
+  display: flex;
+  height: 100%;
+  gap: 1px;
+  background: var(--border-color);
+}
+
+.media-diff-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+  background: var(--bg-primary);
+  overflow: auto;
+}
+
+.media-diff-side img {
+  max-width: 100%;
+  max-height: calc(100% - 32px);
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: repeating-conic-gradient(var(--bg-surface) 0% 25%, var(--bg-hover) 0% 50%) 50% / 16px 16px;
+}
+
+.media-diff-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.media-diff-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.diff-viewer-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.diff-file-path {
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.diff-file-path-sep {
+  margin: 0 6px;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.diff-file-path-name {
+  color: var(--accent);
+}
+
+.diff-file-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.diff-action-btn {
+  padding: 2px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.diff-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.diff-action-btn.copied {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.btn-expand-all {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.btn-expand-all:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

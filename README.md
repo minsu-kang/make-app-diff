@@ -59,7 +59,7 @@ src/
     features/     # sidebar, version-selector, diff, settings, download
     shared/       # api (window bridge), types, ui, utils
     monaco/       # Monaco setup, IMLJSON tokenizer, themes (dark/make/light)
-    styles/       # global.css (all styles + themes)
+    styles/       # tokens.css (theme variables), base.css (reset); components keep their CSS next to them
 ```
 
 ## IPM API

@@ -3,6 +3,7 @@ import type { VersionTags } from '../../shared/types'
 import { showToast } from '../../shared/ui/Toast'
 import VersionTimeline from './VersionTimeline'
 import { getApi } from '../../shared/api/electron-api'
+import './VersionSelector.css'
 
 interface VersionSelectorProps {
   versions: string[]

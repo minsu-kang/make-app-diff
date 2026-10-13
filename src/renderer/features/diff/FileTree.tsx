@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import type { FileDiff } from '../../shared/types'
 import { buildTree, buildFlatList } from './file-tree'
 import { onActivateKey } from '../../shared/utils/keyboard'
+import './FileTree.css'
 
 interface FileTreeProps {
   diffs: FileDiff[]

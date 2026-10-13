@@ -1,0 +1,8 @@
+.download-search-results {
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+}

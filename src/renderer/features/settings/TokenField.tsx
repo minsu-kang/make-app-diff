@@ -1,4 +1,5 @@
 import React from 'react'
+import './TokenField.css'
 
 const iconProps = {
   width: 16,

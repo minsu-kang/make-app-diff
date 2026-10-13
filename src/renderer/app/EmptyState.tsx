@@ -1,4 +1,5 @@
 import MakeLogo from '../shared/ui/MakeLogo'
+import './EmptyState.css'
 
 export default function EmptyState() {
   return (

@@ -1,0 +1,17 @@
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon input {
+  width: 100%;
+  padding-right: 36px;
+}
+
+.token-toggle {
+  position: absolute;
+  right: 4px;
+  font-size: 16px;
+  padding: 2px 4px;
+}

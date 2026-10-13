@@ -1,4 +1,5 @@
 import React from 'react'
+import './ComponentTabs.css'
 
 type ComponentType = 'app' | 'account' | 'hook'
 

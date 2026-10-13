@@ -64,7 +64,7 @@ All IPC handlers return `IpcResult<T>`:
 - **Files**: kebab-case (`ipm-client.ts`)
 - **Components**: PascalCase (`DiffViewer.tsx`)
 - **Types**: Prefer `interface`, define in `types.ts`
-- **Styles**: CSS custom properties for theming (`global.css`)
+- **Styles**: plain CSS next to each component, CSS custom properties for theming (`styles/tokens.css`)
 - **Error handling**: `instanceof Error` check, extract message
 
 ## Key Files
@@ -77,4 +77,5 @@ All IPC handlers return `IpcResult<T>`:
 - `src/renderer/monaco/monaco-setup.ts` — Monaco worker config, loader, language/theme registration
 - `src/renderer/monaco/languages/imljson.ts` — IMLJSON Monarch tokenizer (JSON + IML `{{expressions}}`)
 - `src/renderer/monaco/themes/monaco-themes.ts` — 3 Monaco themes (dark/make/light)
-- `src/renderer/styles/global.css` — All styles + themes (dark/make/light)
+- `src/renderer/styles/tokens.css` — Theme variables (dark/make/light)
+- `src/renderer/styles/base.css` — Reset, body, scrollbars

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useId, useCallback } from 
 import type { SearchApp, SearchEntry } from '../../shared/types'
 import { buildSearchEntries, entryLabel, getSearchInputValue, moveHighlight } from '../../shared/utils/app-search'
 import { getApi } from '../../shared/api/electron-api'
+import './DownloadModal.css'
 
 const MAX_RESULTS = 30
 
