@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/integromat/make-app-diff/compare/v1.7.5...v1.8.0) (2026-10-14)
+
+
+### Features
+
+* count components instead of files ([#28](https://github.com/integromat/make-app-diff/issues/28)) ([9ba0826](https://github.com/integromat/make-app-diff/commit/9ba0826b14d7c75b7e10d382eccde8c46f4dba00))
+
 ## [1.7.5](https://github.com/integromat/make-app-diff/compare/v1.7.4...v1.7.5) (2026-10-13)
 
 
