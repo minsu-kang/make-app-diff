@@ -1,4 +1,5 @@
 import type { FileDiff } from '../../shared/types'
+import { componentKey, isInsideComponent, mergeStatuses } from './components'
 
 export interface TreeNode {
   name: string
@@ -15,7 +16,7 @@ export interface FlatItem {
   depth: number
   diff: FileDiff | null
   folderStatus: string | null
-  fileCount: number
+  componentCount: number
   isExpanded: boolean
 }
 
@@ -46,18 +47,18 @@ export function collectStatuses(node: TreeNode, s: Set<string>): void {
 export function getFolderStatus(node: TreeNode): string | null {
   const s = new Set<string>()
   collectStatuses(node, s)
-  if (s.has('modified')) return 'modified'
-  if (s.has('added') && s.has('deleted')) return 'modified'
-  if (s.has('added')) return 'added'
-  if (s.has('deleted')) return 'deleted'
-  return null
+  return mergeStatuses(s)
 }
 
-export function countFiles(node: TreeNode): number {
-  let c = 0
-  if (node.file) c++
-  for (const child of node.children.values()) c += countFiles(child)
-  return c
+function collectComponentKeys(node: TreeNode, keys: Set<string>): void {
+  if (node.file) keys.add(componentKey(node.file.filePath))
+  for (const child of node.children.values()) collectComponentKeys(child, keys)
+}
+
+export function countComponents(node: TreeNode): number {
+  const keys = new Set<string>()
+  collectComponentKeys(node, keys)
+  return keys.size
 }
 
 function toFlatItem(child: TreeNode, depth: number, isExpanded: boolean): FlatItem {
@@ -71,7 +72,7 @@ function toFlatItem(child: TreeNode, depth: number, isExpanded: boolean): FlatIt
     depth,
     diff: isFolder ? null : child.file,
     folderStatus: isFolder ? getFolderStatus(folderNode) : null,
-    fileCount: isFolder ? countFiles(folderNode) : 0,
+    componentCount: isFolder && !isInsideComponent(child.fullPath) ? countComponents(folderNode) : 0,
     isExpanded
   }
 }
@@ -99,7 +100,7 @@ export function buildFlatList(root: TreeNode, expandedFolders: Set<string>): Fla
           depth,
           diff: child.file,
           folderStatus: null,
-          fileCount: 0,
+          componentCount: 0,
           isExpanded: false
         })
       }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildTree, getFolderStatus, collectStatuses, countFiles, buildFlatList } from '../file-tree'
+import { buildTree, getFolderStatus, collectStatuses, countComponents, buildFlatList } from '../file-tree'
 import type { FileDiff } from '../../../shared/types'
 
 function makeDiff(filePath: string, status: FileDiff['status']): FileDiff {
@@ -92,16 +92,29 @@ describe('getFolderStatus', () => {
   })
 })
 
-describe('countFiles', () => {
-  it('counts files in nested tree', () => {
+describe('countComponents', () => {
+  it('counts the files outside the component folders one by one', () => {
     const root = buildTree([makeDiff('a/x.ts', 'added'), makeDiff('a/b/y.ts', 'modified'), makeDiff('c.ts', 'deleted')])
-    expect(countFiles(root)).toBe(3)
-    expect(countFiles(root.children.get('a')!)).toBe(2)
+    expect(countComponents(root)).toBe(3)
+    expect(countComponents(root.children.get('a')!)).toBe(2)
+  })
+
+  it('counts the files of a component once', () => {
+    const root = buildTree([
+      makeDiff('modules/send/api.imljson', 'added'),
+      makeDiff('modules/send/metadata.json', 'added'),
+      makeDiff('modules/get/api.imljson', 'modified'),
+      makeDiff('functions/pad/code.js', 'added'),
+      makeDiff('base.imljson', 'modified')
+    ])
+    expect(countComponents(root)).toBe(4)
+    expect(countComponents(root.children.get('modules')!)).toBe(2)
+    expect(countComponents(root.children.get('modules')!.children.get('send')!)).toBe(1)
   })
 
   it('returns 0 for empty tree', () => {
     const root = buildTree([])
-    expect(countFiles(root)).toBe(0)
+    expect(countComponents(root)).toBe(0)
   })
 })
 
@@ -147,11 +160,32 @@ describe('buildFlatList', () => {
     expect(items[2].depth).toBe(2) // c.ts
   })
 
-  it('includes folder metadata (folderStatus, fileCount)', () => {
+  it('includes folder metadata (folderStatus, componentCount)', () => {
     const root = buildTree([makeDiff('dir/a.ts', 'added'), makeDiff('dir/b.ts', 'added')])
     const items = buildFlatList(root, new Set())
     expect(items[0].folderStatus).toBe('added')
-    expect(items[0].fileCount).toBe(2)
+    expect(items[0].componentCount).toBe(2)
+  })
+
+  describe('component folders', () => {
+    const root = buildTree([
+      makeDiff('modules/send/api.imljson', 'added'),
+      makeDiff('modules/send/metadata.json', 'added'),
+      makeDiff('modules/send/docs/readme.md', 'added'),
+      makeDiff('modules/get/api.imljson', 'modified')
+    ])
+    const items = buildFlatList(root, new Set(['modules', 'modules/send']))
+    const countOf = (key: string) => items.find((i) => i.key === key)?.componentCount
+
+    it('counts the components in the folder that holds them', () => {
+      expect(countOf('modules')).toBe(2)
+    })
+
+    it('has no count on a component folder or on a folder inside one', () => {
+      expect(countOf('modules/send')).toBe(0)
+      expect(countOf('modules/get')).toBe(0)
+      expect(countOf('modules/send/docs')).toBe(0)
+    })
   })
 
   describe('a path that is both a file and a folder', () => {
@@ -174,7 +208,7 @@ describe('buildFlatList', () => {
       const items = buildFlatList(buildTree(diffs), new Set(['assets']))
       const folder = items[2]
       expect(folder.diff).toBeNull()
-      expect(folder.fileCount).toBe(1)
+      expect(folder.componentCount).toBe(1)
       expect(folder.folderStatus).toBe('added')
     })
 

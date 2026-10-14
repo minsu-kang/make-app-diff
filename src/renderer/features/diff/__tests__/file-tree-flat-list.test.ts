@@ -23,7 +23,7 @@ describe('buildFlatList rows', () => {
         depth: 0,
         diff: null,
         folderStatus: 'modified',
-        fileCount: 1,
+        componentCount: 1,
         isExpanded: true
       },
       {
@@ -34,7 +34,7 @@ describe('buildFlatList rows', () => {
         depth: 1,
         diff: changed,
         folderStatus: null,
-        fileCount: 0,
+        componentCount: 0,
         isExpanded: false
       },
       {
@@ -45,7 +45,7 @@ describe('buildFlatList rows', () => {
         depth: 0,
         diff: readme,
         folderStatus: null,
-        fileCount: 0,
+        componentCount: 0,
         isExpanded: false
       }
     ])
@@ -63,7 +63,7 @@ describe('buildFlatList rows', () => {
         depth: 0,
         diff: null,
         folderStatus: 'deleted',
-        fileCount: 1,
+        componentCount: 1,
         isExpanded: false
       }
     ])
@@ -83,7 +83,7 @@ describe('buildFlatList rows', () => {
         depth: 0,
         diff: icon,
         folderStatus: null,
-        fileCount: 0,
+        componentCount: 0,
         isExpanded: false
       },
       {
@@ -94,7 +94,7 @@ describe('buildFlatList rows', () => {
         depth: 0,
         diff: null,
         folderStatus: 'added',
-        fileCount: 1,
+        componentCount: 1,
         isExpanded: true
       },
       {
@@ -105,7 +105,7 @@ describe('buildFlatList rows', () => {
         depth: 1,
         diff: logo,
         folderStatus: null,
-        fileCount: 0,
+        componentCount: 0,
         isExpanded: false
       }
     ])

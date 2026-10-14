@@ -41,7 +41,7 @@ test('compares two versions of an app and shows the diff of a changed file', asy
   await page.getByLabel(/^To/).selectOption({ label: 'v1.2.0' })
   await page.getByRole('button', { name: 'Compare' }).click()
 
-  await expect(page.getByText('Changed files (4)')).toBeVisible()
+  await expect(page.getByText('Changed components (4)')).toBeVisible()
   await expect(page.locator('.tab-badge-add')).toHaveText('+1')
   await expect(page.locator('.tab-badge-del')).toHaveText('-1')
   await expect(page.locator('.tab-badge-mod')).toHaveText('~2')

@@ -6,7 +6,7 @@ import { fail, mockApi, mockMenu, ok } from '../../__tests__/mocks/window-api'
 import type { AppInfo, DiffResult, FileDiff, IpcResult, IpmSettings, SearchAppResult } from '../../shared/types'
 
 const SEARCH_PLACEHOLDER = 'Search by label or name...'
-const CHANGED_FILES = 'Changed files (1)'
+const CHANGED_FILES = 'Changed components (1)'
 const HINT = 'Select two versions above and click Compare to see differences.'
 const LOADING = 'Comparing versions...'
 const NO_VERSION = 'Select version...'
@@ -327,7 +327,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Show' }))
 
     expect(api.ipm.showVersion).toHaveBeenCalledWith('slack', '2.1.0', true)
-    expect(await screen.findByText('Files (1)')).toBeInTheDocument()
+    expect(await screen.findByText('Components (1)')).toBeInTheDocument()
 
     await user.click(screen.getByTitle(RAW_TOGGLE))
 
@@ -996,7 +996,7 @@ describe('App', () => {
 
       await act(async () => pending.resolve(ok(diffResult)))
 
-      expect(await screen.findByText('Files (1)')).toBeInTheDocument()
+      expect(await screen.findByText('Components (1)')).toBeInTheDocument()
       expect(screen.queryByText(LOADING)).not.toBeInTheDocument()
     })
 
@@ -1036,7 +1036,7 @@ describe('App', () => {
 
       await act(async () => pending.resolve(ok(diffResult)))
 
-      expect(screen.queryByText('Files (1)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Components (1)')).not.toBeInTheDocument()
       expect(screen.getByText(HINT)).toBeInTheDocument()
     })
 
@@ -1217,7 +1217,7 @@ describe('App', () => {
 
       await user.click(screen.getByRole('button', { name: 'Retry' }))
 
-      expect(await screen.findByText('Files (1)')).toBeInTheDocument()
+      expect(await screen.findByText('Components (1)')).toBeInTheDocument()
       expect(screen.queryByText(NOT_FOUND)).not.toBeInTheDocument()
       expect(api.ipm.showVersion).toHaveBeenNthCalledWith(2, 'slack', '2.1.0', true)
       expect(api.ipm.getDiff).not.toHaveBeenCalled()
@@ -1234,7 +1234,7 @@ describe('App', () => {
 
       await user.click(screen.getByRole('button', { name: 'Retry' }))
 
-      expect(await screen.findByText('Files (1)')).toBeInTheDocument()
+      expect(await screen.findByText('Components (1)')).toBeInTheDocument()
       expect(api.ipm.showVersion).toHaveBeenNthCalledWith(1, 'slack', '2.0.0', true)
       expect(api.ipm.showVersion).toHaveBeenNthCalledWith(2, 'slack', '2.1.0', true)
       expect(api.ipm.getDiff).not.toHaveBeenCalled()
@@ -1288,14 +1288,14 @@ describe('App', () => {
       expect(screen.queryByText(CONNECTIONS_DIR)).not.toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: /^Connection/ }))
-      expect(screen.getByText('Changed files (2)')).toBeInTheDocument()
+      expect(screen.getByText('Changed components (2)')).toBeInTheDocument()
       expect(screen.getByText('accounts')).toBeInTheDocument()
       expect(screen.getByText(CONNECTIONS_DIR)).toBeInTheDocument()
       expect(screen.queryByText('modules')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^Connection/ })).toHaveClass('active')
 
       await user.click(screen.getByRole('button', { name: /^Webhook/ }))
-      expect(screen.getByText('Changed files (2)')).toBeInTheDocument()
+      expect(screen.getByText('Changed components (2)')).toBeInTheDocument()
       expect(screen.getByText('hooks')).toBeInTheDocument()
       expect(screen.getByText('webhooks')).toBeInTheDocument()
       expect(screen.queryByText('accounts')).not.toBeInTheDocument()
@@ -1337,7 +1337,7 @@ describe('App', () => {
       await user.click(screen.getByRole('button', { name: /^Webhook/ }))
 
       expect(screen.getByText('No changes')).toBeInTheDocument()
-      expect(screen.queryByText(/Changed files/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Changed components/)).not.toBeInTheDocument()
       expect(screen.queryByText(NO_FILE)).not.toBeInTheDocument()
     })
 
@@ -1477,7 +1477,7 @@ describe('App', () => {
       await selectApp(user)
       await user.selectOptions(await screen.findByLabelText('To'), NO_VERSION)
       await showFromDownload(user, '2.0.0')
-      expect(await screen.findByText('Files (1)')).toBeInTheDocument()
+      expect(await screen.findByText('Components (1)')).toBeInTheDocument()
 
       await user.click(screen.getByTitle(VSCODE_TITLE))
       expect(api.editor.openInVscode).not.toHaveBeenCalled()

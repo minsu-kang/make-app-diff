@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import type { FileDiff } from '../../shared/types'
-import { buildTree, buildFlatList } from './file-tree'
+import { buildTree, buildFlatList, countComponents } from './file-tree'
 import { onActivateKey } from '../../shared/utils/keyboard'
 import './FileTree.css'
 
@@ -81,6 +81,7 @@ export default function FileTree({
   const isResizing = useRef(false)
 
   const tree = useMemo(() => buildTree(diffs), [diffs])
+  const componentCount = useMemo(() => countComponents(tree), [tree])
 
   useEffect(() => {
     setExpandedFolders(new Set())
@@ -143,7 +144,7 @@ export default function FileTree({
         </div>
       )}
       <div className="file-tree-header">
-        {viewMode === 'show' ? 'Files' : 'Changed files'} ({diffs.length})
+        {viewMode === 'show' ? 'Components' : 'Changed components'} ({componentCount})
       </div>
       <ul className="file-list" role="tree">
         {flatItems.map((item) => {
@@ -181,7 +182,7 @@ export default function FileTree({
                   >
                     {item.name}
                   </span>
-                  <span className="tree-badge">{item.fileCount}</span>
+                  {item.componentCount > 0 && <span className="tree-badge">{item.componentCount}</span>}
                 </>
               ) : (
                 <>

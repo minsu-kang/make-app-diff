@@ -245,6 +245,7 @@ Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature us
 - File/folder name color indicates status: green=added, yellow=modified, red=deleted
 - Resizable panel (drag right edge, 180–600px range)
 - Starts collapsed; user expands folders manually
+- Counts are components, not files (`components.ts`): the files of one module, RPC, function, endpoint, connection or webhook folder count once, and a file outside those folders counts on its own. The header shows the components and a folder badge the components inside it; a component folder and the folders in it have no badge
 
 ### DiffViewer (`features/diff/DiffViewer.tsx`)
 - Uses Monaco DiffEditor (`@monaco-editor/react`) for all diff/code views
@@ -277,7 +278,7 @@ Imports go down only. `app` uses `features`, `shared` and `monaco`; a feature us
 - Range highlighting between from and to
 
 ### ComponentTabs (`features/diff/ComponentTabs.tsx`)
-- App / Connection / Webhook tabs with colored change count badges
+- App / Connection / Webhook tabs with colored change count badges; the counts are changed components (`countChanges` in `filter-diffs.ts`). A component is added or deleted when all its changed files are, modified otherwise, the same rule as the folder colors in FileTree. The renderer only gets the changed files, so a component that gains or loses one file while its other files stay the same (for example a module that only gets `epoch.imljson`) counts as added or deleted
 
 ### DownloadModal (`features/download/DownloadModal.tsx`)
 - Search + select app, pick version, download to folder

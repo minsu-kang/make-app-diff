@@ -46,6 +46,43 @@ describe('countChanges', () => {
     expect(countChanges(diffs)).toEqual({ added: 2, deleted: 1, modified: 2 })
   })
 
+  it('counts the files of a component once', () => {
+    const diffs = [
+      file('modules/send/api.imljson', 'added'),
+      file('modules/send/metadata.json', 'added'),
+      file('modules/send/scope.imljson', 'added'),
+      file('connections/oauth/api.imljson', 'deleted'),
+      file('connections/oauth/metadata.json', 'deleted')
+    ]
+
+    expect(countChanges(diffs)).toEqual({ added: 1, deleted: 1, modified: 0 })
+  })
+
+  it('counts a component with mixed statuses as modified', () => {
+    const diffs = [
+      file('modules/send/api.imljson'),
+      file('modules/send/metadata.json', 'added'),
+      file('modules/get/api.imljson', 'added'),
+      file('modules/get/old.imljson', 'deleted')
+    ]
+
+    expect(countChanges(diffs)).toEqual({ added: 0, deleted: 0, modified: 2 })
+  })
+
+  it('counts every file outside a component folder on its own', () => {
+    const diffs = [file('base.imljson'), file('assets/a.png', 'added'), file('assets/b.png', 'added')]
+
+    expect(countChanges(diffs)).toEqual({ added: 2, deleted: 0, modified: 1 })
+  })
+
+  it('counts a component that only has unchanged files as nothing', () => {
+    expect(countChanges([file('modules/send/api.imljson', 'unchanged')])).toEqual({
+      added: 0,
+      deleted: 0,
+      modified: 0
+    })
+  })
+
   it('does not count unchanged files', () => {
     expect(countChanges([file('a', 'unchanged')])).toEqual({ added: 0, deleted: 0, modified: 0 })
   })

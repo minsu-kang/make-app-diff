@@ -14,7 +14,7 @@ const SEND_PATH = 'modules/send/api.imljson'
 const GET_PATH = 'modules/get/api.imljson'
 const APP_NAME = 'slack'
 const VERSION_RANGE = '1.0.0 → 2.0.0'
-const CHANGED_HEADER = 'Changed files (3)'
+const CHANGED_HEADER = 'Changed components (3)'
 const ARIA_EXPANDED = 'aria-expanded'
 const ARIA_SELECTED = 'aria-selected'
 const COL_RESIZE = 'col-resize'
@@ -166,9 +166,9 @@ describe('FileTree', () => {
     expect(screen.getByText(VERSION_RANGE)).toBeInTheDocument()
   })
 
-  it('labels the header Files in show mode', () => {
+  it('labels the header Components in show mode', () => {
     render(<FileTree diffs={diffs} selectedFile={null} onFileSelect={vi.fn()} viewMode="show" />)
-    expect(screen.getByText('Files (3)')).toBeInTheDocument()
+    expect(screen.getByText('Components (3)')).toBeInTheDocument()
   })
 
   describe('empty state', () => {
@@ -206,11 +206,25 @@ describe('FileTree', () => {
       expect(names()).toEqual([MODULES, META_FILE])
     })
 
-    it('counts the files in show mode too', () => {
+    it('counts the components in show mode too', () => {
       renderTree({ viewMode: 'show', diffs: [diff('a.json'), diff('b/c.json'), diff('b/d.json'), diff('e.json')] })
 
-      expect(screen.getByText('Files (4)')).toBeInTheDocument()
-      expect(screen.queryByText(/Changed files/)).not.toBeInTheDocument()
+      expect(screen.getByText('Components (4)')).toBeInTheDocument()
+      expect(screen.queryByText(/Changed components/)).not.toBeInTheDocument()
+    })
+
+    it('counts the files of a component once', () => {
+      renderTree({
+        diffs: [
+          diff('modules/send/api.imljson'),
+          diff('modules/send/metadata.json'),
+          diff('modules/send/scope.imljson'),
+          diff('connections/oauth/api.imljson'),
+          diff('connections/oauth/metadata.json')
+        ]
+      })
+
+      expect(screen.getByText('Changed components (2)')).toBeInTheDocument()
     })
 
     it('shows the app name and the compared versions in diff mode', () => {
@@ -361,6 +375,29 @@ describe('FileTree', () => {
       expect(badge(row('one.json'))).toBeNull()
       expect(badge(row('two.json'))).toBeNull()
       expect(badge(row('root.json'))).toBeNull()
+    })
+
+    it('counts the components in a folder, not their files, and shows no count on a component', async () => {
+      const user = userEvent.setup()
+      renderTree({
+        diffs: [
+          diff('modules/send/api.imljson'),
+          diff('modules/send/metadata.json'),
+          diff('modules/get/api.imljson'),
+          diff('modules/get/metadata.json'),
+          diff('modules/get/scope.imljson'),
+          diff('functions/pad/code.js'),
+          diff('assets/a.png'),
+          diff('assets/b.png')
+        ]
+      })
+      await open(user, MODULES)
+
+      expect(badge(row(MODULES))).toBe('2')
+      expect(badge(row('functions'))).toBe('1')
+      expect(badge(row('assets'))).toBe('2')
+      expect(badge(row('send'))).toBeNull()
+      expect(badge(row('get'))).toBeNull()
     })
 
     it('counts a folder next to a file with the same path separately', async () => {
@@ -666,7 +703,7 @@ describe('FileTree', () => {
       rerender({ diffs: [diff('other/x.json'), diff('y.json')] })
 
       expect(names()).toEqual(['other', 'y.json'])
-      expect(screen.getByText('Changed files (2)')).toBeInTheDocument()
+      expect(screen.getByText('Changed components (2)')).toBeInTheDocument()
     })
   })
 
