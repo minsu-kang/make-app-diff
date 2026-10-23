@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/integromat/make-app-diff/compare/v1.8.0...v1.8.1) (2026-10-23)
+
+
+### Continuous Integration
+
+* pin Node to 24.22.1 ([#30](https://github.com/integromat/make-app-diff/issues/30)) ([efe18f2](https://github.com/integromat/make-app-diff/commit/efe18f29cbda41b22ec52866e803e3de4f57d4fb))
+
 ## [1.8.0](https://github.com/integromat/make-app-diff/compare/v1.7.5...v1.8.0) (2026-10-14)
 
 
