@@ -18,7 +18,7 @@ Built with Electron + React + TypeScript for macOS and Windows.
 
 ## Installation
 
-Download the latest release from the [Releases](https://github.com/integromat/make-app-diff/releases) page. The repository is private, so you must be an integromat org member signed in to GitHub:
+Download the latest release from the [Releases](https://github.com/minsu-kang/make-app-diff/releases) page. The repository is private, so you need access to it and must be signed in to GitHub:
 - **macOS**: `.dmg` file (Apple Silicon only)
 - **Windows**: `.exe` installer
 
