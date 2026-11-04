@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.3](https://github.com/minsu-kang/make-app-diff/compare/v1.8.2...v1.8.3) (2026-11-04)
+
+
+### Bug Fixes
+
+* **deps:** clear the npm audit alerts without moving to vite 8 ([#69](https://github.com/minsu-kang/make-app-diff/issues/69)) ([d05ae8a](https://github.com/minsu-kang/make-app-diff/commit/d05ae8a722c18d9b2e1e733b2f09648c88a6a1d3))
+
 ## [1.8.2](https://github.com/minsu-kang/make-app-diff/compare/v1.8.1...v1.8.2) (2026-11-04)
 
 
