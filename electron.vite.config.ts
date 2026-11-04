@@ -1,10 +1,9 @@
 import { resolve } from 'path'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
         input: {
@@ -14,7 +13,6 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
         input: {
@@ -25,6 +23,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    esbuild: { legalComments: 'inline' },
     build: {
       rollupOptions: {
         input: {

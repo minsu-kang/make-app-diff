@@ -82,10 +82,10 @@ When a downloaded app is detected as a custom app (contains `lib/app.js`), the d
 
 ## Tech Stack
 
-- **Electron** 43.4.1 — Desktop runtime
+- **Electron** 43.8.7 — Desktop runtime
 - **React** 18.3.1 — UI framework
 - **TypeScript** 5.9.3 — Type safety
-- **electron-vite** 2.3.0 — Build tooling with HMR
+- **electron-vite** 6.0.0 — Build tooling with HMR
 - **monaco-editor** + **@monaco-editor/react** — Diff rendering
 - **electron-store** — Persistent settings
 - **pkr** — PKR archive extraction
