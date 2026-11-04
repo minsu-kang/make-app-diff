@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/minsu-kang/make-app-diff/compare/v1.8.1...v1.8.2) (2026-11-04)
+
+
+### Bug Fixes
+
+* open the minsu-kang Releases page from the File menu ([4b876f6](https://github.com/minsu-kang/make-app-diff/commit/4b876f66f1d731ce47fc9d5ebdda32b390c2e9d9))
+
 ## [1.8.1](https://github.com/integromat/make-app-diff/compare/v1.8.0...v1.8.1) (2026-10-23)
 
 
