@@ -6,7 +6,7 @@ afterEach(() => {
 })
 
 describe('isWebUrl', () => {
-  it.each(['https://github.com/integromat/make-app-diff/releases', 'http://localhost:3000/a?b=c'])(
+  it.each(['https://github.com/minsu-kang/make-app-diff/releases', 'http://localhost:3000/a?b=c'])(
     'accepts %s',
     (url) => {
       expect(isWebUrl(url)).toBe(true)

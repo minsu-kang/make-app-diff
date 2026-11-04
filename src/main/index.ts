@@ -6,7 +6,7 @@ import { resolveIpmBaseUrl } from './services/ipm-base-url'
 import { isWebUrl, openExternal } from './services/external-link'
 import { loadRenderer } from './services/renderer-loader'
 
-const RELEASES_URL = 'https://github.com/integromat/make-app-diff/releases'
+const RELEASES_URL = 'https://github.com/minsu-kang/make-app-diff/releases'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
