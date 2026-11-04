@@ -6,9 +6,9 @@ Electron desktop app for viewing diffs between Make.com app versions.
 
 ## Tech Stack
 
-- **Electron** 43.4.1 + **React** ^18.3 + **TypeScript** ^5.5
+- **Electron** 43.8.7 + **React** ^18.3 + **TypeScript** ^5.5
 - **Node** 24 for local development and every CI job
-- **electron-vite** ^2.3 (build), **monaco-editor** + **@monaco-editor/react** (diff rendering), **electron-store** (persistent storage)
+- **electron-vite** 6.0.0 + **vite** 7.3.7 (build), **monaco-editor** + **@monaco-editor/react** (diff rendering), **electron-store** (persistent storage)
 - macOS (hiddenInset title bar) + Windows (NSIS installer)
 
 ## Commands
